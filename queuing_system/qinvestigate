@@ -1,0 +1,217 @@
+#!/bin/bash
+
+if [ `hostname` != "ccserv1" ]; then
+	echo "Sorry wrong host, please use ccserv1 to run this"
+	exit 1
+fi
+
+if [ "$1" = "-h" ]; then
+	cat << EOF
+Toolkit to investigate and modify queue jobs efficiently.
+For a list of implemented commands start the Skript and type "help".
+
+Skript makes use of the variable \$USER to execute fiters on the queue, 
+so changing this variable in the shell makes it work under a different
+username. Logins still work under the name of current user, however.
+
+The Skript reads the variable QINVESTIGATE_DEFAULT_COMMAND and
+executes the content in case an empty line is executed, ie
+by just pressing <return> when the commandline shows.
+By default executing an empty line does nothing.
+EOF
+	exit 0
+fi
+
+#------------------------------------------------------------------------
+
+function displayHelp() {
+	cat << EOF
+The following commands are implemented at the moment:
+help              displays this help
+refresh           refresh qinvestigate display
+login <ID>        login to node
+llscratch <ID>    login to node and cd to /lscratch/<ID>
+ltop              login to node and execute "top"
+delete <ID>       delete job
+quit              quit script
+
+shorter aliases:
+lls     same as   llscratch
+del               delete
+h                 help
+r                 refresh
+q                 quit
+ssh               login
+EOF
+}
+
+#------------------------------------------------------------------------
+
+function loginNode() {
+	ssh $NODE
+}
+
+function llscratchNode() {
+	ssh -t $NODE "cd /lscratch/$ID; bash -il"
+}
+
+function ltopNode() {
+	ssh -t $NODE "top"
+}
+
+function deleteJob() {
+	read -p "Sure you want to delete job $ID?  " RES
+	if [ "$RES" == "y" ]; then
+		qdel $ID
+	fi
+}
+
+
+#------------------------------------------------------------------------
+
+#Is there even a job in the queue
+if qstat -u $USER | grep $USER > /dev/null; then
+	#all fine
+	:
+else
+	echo "!!!   You currently have no job in the queue; Terminating   !!!"
+	exit 0
+fi
+
+PROMPT="Type in command followed by job ID  (h for help; q quits)  > "
+SUPRESS_QSTAT_ON_NEXT_RUN=0
+while true; do
+	if [ "$SUPRESS_QSTAT_ON_NEXT_RUN" != "1" ]; then
+		echo current jobs owned by you:
+		qstat -nu $USER | awk '$1 != "--"'
+		echo
+	else
+		SUPRESS_QSTAT_ON_NEXT_RUN=0
+	fi
+
+	#read input from user
+	ID=""
+	COMM=""
+	LINE=""
+	read -p "$PROMPT" LINE
+	PROMPT="comm ID  > " #shorten future promts
+
+	if [ "$LINE" == "" ]; then
+		if [ "$QINVESTIGATE_DEFAULT_COMMAND" ]; then
+			LINE=$QINVESTIGATE_DEFAULT_COMMAND
+		else
+			SUPRESS_QSTAT_ON_NEXT_RUN=1
+			continue
+		fi
+	fi
+
+	COMM=`echo $LINE | awk '{print $1}'`
+	ID=`echo $LINE | awk '{print $2}'`
+
+	#do functions without an argument here:
+	case $COMM in 
+		r)
+			continue
+			;;
+		refresh)
+			continue
+			;;
+		q)
+			exit 0
+			;;
+		quit)
+			exit 0
+			;;
+		exit)
+			exit 0
+			;;
+		h)
+			echo
+			displayHelp
+			SUPRESS_QSTAT_ON_NEXT_RUN=1
+			echo
+			continue
+			;;
+		help)
+			echo
+			displayHelp
+			SUPRESS_QSTAT_ON_NEXT_RUN=1
+			echo
+			continue
+			;;
+	esac
+	echo
+
+	#For all of the rest we need two arguments; if no second argument present try to default to single node if present.
+	if [ "$ID" == "" ]; then
+		QSTATUSER=`qstat -u $USER | grep $USER`
+		if [[ "$QSTATUSER" != "" && `echo $QSTATUSER | awk '{if (NR > 1) {exit}}; END {print NR}'` == 1 ]]; then
+			ID=`echo "$QSTATUSER" | awk '{print $1}'`
+		else
+			echo "!!!  Second argument missing  !!!"
+			echo "!!!  Type \"help\" for a list of commands  !!!"
+			SUPRESS_QSTAT_ON_NEXT_RUN=1
+			echo
+			continue
+		fi
+	fi
+
+	# check for valid node argument:
+	NODE=`qnodes | grep -B5 "$ID"`
+	if [ $? != "0" ]; then
+		echo "!!!  Sorry, could not find this host  !!!"
+		SUPRESS_QSTAT_ON_NEXT_RUN=1
+		echo
+		continue
+	fi
+	if [ `echo "$NODE" | awk '{if (NR > 7) {exit}}; END {print NR}'` -gt "7" ];then
+		echo "!!!  Sorry, more than one host did match your criteria  !!!"
+		SUPRESS_QSTAT_ON_NEXT_RUN=1
+		echo
+		continue
+	fi
+	NODE=`echo "$NODE" | head -n1`
+
+	#normalise ID input
+	GREPID=`qstat | grep $ID`
+	if [ `echo $GREPID | awk '{if (NR > 1) {exit}}; END {print NR}'` -gt 1 ]; then
+		echo "  WARNING: failed to normalised ID input $ID"
+		echo "           possible that some features like \"del\" don't work properly"
+		read -p "           Continue with execution?  " RES
+		if [ "$RES" != "y" ]; then
+			echo
+			SUPRESS_QSTAT_ON_NEXT_RUN=1
+			continue
+		fi
+	else
+		ID=`echo "$GREPID" | awk '{print $1}'`
+	fi
+
+	#do functions with argument here
+	case $COMM in
+		ssh)
+			loginNode
+			;;
+		login)
+			loginNode
+			;;
+		llscratch)
+			llscratchNode
+			;;
+		lls)
+			llscratchNode
+			;;
+		ltop)
+			ltopNode
+			;;
+
+	#-------------------------------------
+		*)
+			echo "!!!  Unrecognised command: $COMM  !!!"
+			echo "!!!  Type \"help\" for a list of commands  !!!"
+			SUPRESS_QSTAT_ON_NEXT_RUN=1
+			echo
+			continue
+	esac
+done
+

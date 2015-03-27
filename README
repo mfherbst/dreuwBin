@@ -1,0 +1,86 @@
+##############################
+#-- Getting the repository --#
+##############################
+
+If you already have access to the git repository on ccsvn, just run
+from your $HOME or any directory you like:
+	git clone ssh://gitte@ccsvn.iwr.uni-heidelberg.de:42022/dreuwBin
+
+else you should send one of the git admins of ccsvn your ssh public
+key first.
+
+
+####################################################################
+#-- Setup --#
+#############
+
+Let us assume you cloned the files into ~/dreuwBin.
+
+If you just want to use some of the scripts in this repository
+the simplest option is most probably to just link to them directly
+from your ~/bin, eg
+	ln  -s ~/dreuwBin/quotaUsage.sh ~/bin/
+
+If you want to use all scripts or almost all of them consider 
+sourcing the bash snippet setPATH.sh, by issuing in your ~/.bashrc
+	. "$HOME/dreuwBin/setPATH.sh"
+
+If additionall you want tab completion for all commands where this
+is available you should add to your ~/.bash_completion
+	[[ -f $HOME/dreuwBin/enable.bash_completion && \
+	   -r $HOME/dreuwBin/enable.bash_completion ]] \
+	    && . $HOME/dreuwBin/enable.bash_completion
+
+
+####################################################################
+#-- Submitting scripts --#
+##########################
+
+Access to the master branch (ie the one you check out by default)
+is forbidden. If you want to submit changes, create a trunk branch
+and code there. Then send the git admins a merge request.
+
+Note that your changes will only be considered if you satisfy the 
+coding requirements.
+
+
+####################################################################
+#-- Coding guidelines --#
+#########################
+
+1. Scripts should be general. They should work for all users of 
+   this group. So no configuration of any kind script itself. 
+   Use an external config file for that purpose.
+
+2. Code should be clear and sound with enough comments such that
+   it is easy to understand what is going on.
+
+3. Config files should be expected in the folder "$HOME/.dreuwBin" 
+   -- ideally in a file that has a name similer to the name of 
+   the script itself (ie. if the script is blubber.sh, the config 
+   is blubber.cfg).
+
+4. Input provided via (Config-)files or commandline flags should be 
+   checked for basic sanity before use, ie. does the file exist,
+   is the number in the right range, ...
+
+5. If the action of the script is non-obvious, then a "-h" flag
+   has to be provided that spits out a (hopefully) complete
+   documentation of the available flags and features.
+   NOTE: Any script taking a single commandline argument or that 
+         has more than a few lines of code should be 
+         considered to be "non-obvious".
+
+6. If the script fails it should exit with a return code != 0
+   (eg. call "exit 1"). All error output should be written to 
+   stderr, whilst normal output goes to stdout.
+
+7. Temporary files and folders should be cleaned up properly 
+   before exiting (regardless if the script execution fails
+   or is successful)
+
+8. If in doubt ask the user or abort. Avoid Philippians or 
+   Danielisms. ;)
+
+#TODO: Write a library to ease with this guidelines regarding
+#      input sanity and config files

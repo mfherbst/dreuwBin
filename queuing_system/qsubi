@@ -1,0 +1,65 @@
+#!/bin/bash
+
+WALLTIME="48" #hours
+MEMORY="32" #gb
+PROC="4" #processors
+
+prelim_check() {
+	if [ "$HOSTNAME" != "ccserv1" ]; then
+		echo "Wrong host, use ccserv1" >&2
+		exit 1
+	fi
+} && prelim_check
+
+print_help() {
+	cat << EOF
+	$(basename $0) [ -h | --help | <Options> ]
+
+Run an interactive job.
+
+Options:
+--np <np>       number of processors (Default: $PROC)
+--wt <hours>    hours of walltime    (Default: $WALLTIME)
+--mem <gb>      gb of memory         (Default: $MEMORY)
+EOF
+}
+
+###########################################################
+
+SCREENCHECK="yes"
+while [ "$1" ]; do 
+	case "$1" in 
+		"-h"|"--help")
+			print_help
+			exit 0
+			;;
+		"--np")
+			shift
+			PROC=$1
+			;;
+		"--wt")
+			shift
+			WALLTIME="$1"
+			;;
+		"--mem")
+			shift
+			MEMORY="$1"
+			;;
+		"--no-screen-check")
+			SCREENCHECK="no"
+			;;
+		*)
+			echo "Unknown arg: $1" >&2
+			exit 1
+	esac
+	shift
+done
+
+if [[ -z "$STY" && "$SCREENCHECK" != "no" ]]; then
+	echo "No screen session active. Run within screen or supply --no-screen-check" >&2
+	exit 1
+fi
+
+#PMEM=$((MEMORY/PROC))
+#qsub -l "nodes=1:ppn=$PROC" -l "walltime=${WALLTIME}:00:00" -l "mem=${MEMORY}gb" -l "pmem=${PMEM}gb" -I
+qsub -l "nodes=1:ppn=$PROC" -l "walltime=${WALLTIME}:00:00" -l "vmem=${MEMORY}gb"  -I
