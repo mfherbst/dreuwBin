@@ -13,14 +13,176 @@ For a list of implemented commands start the Skript and type "help".
 Skript makes use of the variable \$USER to execute fiters on the queue, 
 so changing this variable in the shell makes it work under a different
 username. Logins still work under the name of current user, however.
-
-The Skript reads the variable QINVESTIGATE_DEFAULT_COMMAND and
-executes the content in case an empty line is executed, ie
-by just pressing <return> when the commandline shows.
-By default executing an empty line does nothing.
 EOF
 	exit 0
 fi
+
+#Is there even a job in the queue
+if qstat -u $USER | grep $USER > /dev/null; then
+	#all fine
+	:
+else
+	echo "!!!   You currently have no job in the queue; Terminating   !!!"
+	exit 0
+fi
+
+#required for @( ) and ?( ) patterns in case ... and other pathname expansions
+shopt -qs extglob
+
+#########################################################################
+#-- command cache --#
+#####################
+list_commands() {
+	#list all commands
+	list_commands_none
+	echo -n " "
+	list_commands_id
+	echo -n " "
+	list_commands_list
+	echo -n " "
+	list_commands_node
+}
+
+list_commands_none() {
+	#get list of commands that require no argument
+	fill_list_commands_cache
+	echo -n "$COMMANDS_NONE"
+}
+
+list_commands_id() {
+	#get list of commands that require a single job id
+	fill_list_commands_cache
+	echo -n "$COMMANDS_ID"
+}
+
+list_commands_list() {
+	#get list of commands that require a list of job ids
+	fill_list_commands_cache
+	echo -n "$COMMANDS_LIST"
+}
+
+list_commands_node() {
+	#get list of commands that require a list of job ids
+	fill_list_commands_cache
+	echo -n "$COMMANDS_NODE"
+}
+
+fill_list_commands_cache() {
+	#fill cache for the lists of available commands
+	[ "$COMMANDS_NONE" ] && return
+	COMMANDS_NONE=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_none ().*/\1/p' | tr '\n' ' ')
+	COMMANDS_ID=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_id ().*/\1/p' | tr '\n' ' ')
+	COMMANDS_LIST=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_list ().*/\1/p' | tr '\n' ' ')
+	COMMANDS_NODE=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_node ().*/\1/p' | tr '\n' ' ')
+}
+
+empty_list_commands_cache() {
+	COMMANDS_NONE=
+	COMMANDS_ID=
+	COMMANDS_LIST=
+	COMMANDS_NODE=
+}
+
+#########################################################################
+#-- shell --#
+#############
+
+run_command() {
+	# interpret and run a command
+	# $1: command
+	# $2 to $n: arguments
+
+	local CMD="$1"
+	local ID=""
+	local NODE=""
+	local LIST=""
+	shift
+	
+	#fill command if neccessary:
+	[ -z "$COMMANDS_NONE" ] && fill_list_commands_cache
+
+	#interpret the command:
+	case "$CMD" in
+		#the @( ) and ?( ) patterns require extglob !!
+		@(${COMMANDS_NONE// /|})?(+([[:space:]])*))
+			c_${CMD}_none
+			return $?
+			;;
+		@(${COMMANDS_ID// /|})?(+([[:space:]])*))
+			#TODO: determine id from remaining args
+			c_${CMD}_id "$ID"
+			return $?
+			;;
+		@(${COMMANDS_NODE// /|})?(+([[:space:]])*))
+			#TODO: determine node from remaining args
+			c_${CMD}_node "$NODE"
+			return $?
+			;;
+		@(${COMMANDS_LIST// /|})?(+([[:space:]])*))
+			#TODO: determine id list from remaining args
+			c_${CMD}_list "$LIST"
+			return $?
+			;;
+		*)
+			 echo "Unrecognised command: $CMD"
+			 echo "Type help for a list of commands"
+			 return 1
+			 ;;
+	esac
+}
+
+
+#########################################################################
+#-- commands --#
+################
+#Note: - functions for commands start with a "c_", followed by the
+#        commands name and a suffix for the kind of arguments the 
+#        command requires:
+#            - "_none" for no argument 
+#            - "_id"   for a single job id
+#            - "_list" for a list of job ids or a single job id.
+#            - "_node" if the job requires a node as the argument
+#      - they should contain a comment line starting with #HELP that
+#        documents the commands action shortly
+#      - if the command requires a single job id to work the functions
+#        name has to 
+
+c_help_none() {
+	#HELP print this help
+	cat <<- EOF
+	The following commands are implemented:
+	EOF
+
+	echo "#############"	
+	list_commands
+	echo
+	echo "#############"	
+}
+
+c_login_node() {
+	#HELP login to the job's node and cd to TMPDIR
+	#llscratchNode
+	echo $FUNCNAME called
+}
+
+c_top_node() {
+	#HELP login to the job's node and call top
+	#ltopNode
+	echo $FUNCNAME called
+}
+
+c_stats_id() {
+	#HELP display some job statistics
+	#echo stats called
+	echo $FUNCNAME called
+}
+
+c_delete_list() {
+	#HELP delete the jobs
+	#deleteJob
+	echo $FUNCNAME called
+}
+
 
 #------------------------------------------------------------------------
 
@@ -30,22 +192,30 @@ The following commands are implemented at the moment:
 help              displays this help
 refresh           refresh qinvestigate display
 login <ID>        login to node
-llscratch <ID>    login to node and cd to /lscratch/<ID>
-ltop              login to node and execute "top"
+top               login to node and execute "top"
 delete <ID>       delete job
 quit              quit script
+experimental      access experimental features.
+                  Read code for doc ;)
 
 shorter aliases:
-lls     same as   llscratch
-del               delete
+del     same as   delete
 h                 help
 r                 refresh
 q                 quit
-ssh               login
+l                 login
+
+NOTE: Major refactoring of this code is going on at the moment
+      the available methods are likely going to change very soon.
 EOF
 }
 
 #------------------------------------------------------------------------
+
+function callExperimental() {
+	shift
+	run_command $@
+}
 
 function loginNode() {
 	ssh $NODE
@@ -69,15 +239,6 @@ function deleteJob() {
 
 #------------------------------------------------------------------------
 
-#Is there even a job in the queue
-if qstat -u $USER | grep $USER > /dev/null; then
-	#all fine
-	:
-else
-	echo "!!!   You currently have no job in the queue; Terminating   !!!"
-	exit 0
-fi
-
 PROMPT="Type in command followed by job ID  (h for help; q quits)  > "
 SUPRESS_QSTAT_ON_NEXT_RUN=0
 while true; do
@@ -93,16 +254,17 @@ while true; do
 	ID=""
 	COMM=""
 	LINE=""
-	read -p "$PROMPT" LINE
+	read -e -p "$PROMPT" LINE
+	history -s $LINE
 	PROMPT="comm ID  > " #shorten future promts
 
 	if [ "$LINE" == "" ]; then
-		if [ "$QINVESTIGATE_DEFAULT_COMMAND" ]; then
-			LINE=$QINVESTIGATE_DEFAULT_COMMAND
-		else
+		#if [ "$QINVESTIGATE_DEFAULT_COMMAND" ]; then
+		#	LINE=$QINVESTIGATE_DEFAULT_COMMAND
+		#else
 			SUPRESS_QSTAT_ON_NEXT_RUN=1
 			continue
-		fi
+		#fi
 	fi
 
 	COMM=`echo $LINE | awk '{print $1}'`
@@ -114,6 +276,12 @@ while true; do
 			continue
 			;;
 		refresh)
+			continue
+			;;
+		experimental)
+			callExperimental $LINE
+			SUPRESS_QSTAT_ON_NEXT_RUN=1
+			echo
 			continue
 			;;
 		q)
@@ -190,10 +358,13 @@ while true; do
 	#do functions with argument here
 	case $COMM in
 		ssh)
-			loginNode
+			llscratchNode
 			;;
 		login)
-			loginNode
+			llscratchNode
+			;;
+		l)
+			llscratchNode
 			;;
 		llscratch)
 			llscratchNode
@@ -201,7 +372,7 @@ while true; do
 		lls)
 			llscratchNode
 			;;
-		ltop)
+		top)
 			ltopNode
 			;;
 
