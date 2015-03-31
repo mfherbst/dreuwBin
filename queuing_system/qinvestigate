@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#TODO: move this block down to preliminary checks or so
 if [ `hostname` != "ccserv1" ]; then
 	echo "Sorry wrong host, please use ccserv1 to run this"
 	exit 1
@@ -250,8 +251,17 @@ parse_job_args() {
 #############
 
 shell_loop() {
-	LASTJOBID=""
 	local RET=0
+
+	#if only one job, than select it here, else empty
+	LASTJOBID=`qstat -u $USER | awk -v "user=$USER" '
+		$2 == user { 
+			if (id != "") { exit 1 }; 
+			id=$1
+	      	}
+		END { print id; exit 0 }
+		'
+	`
 
 	echo "Welcome to the interactive PBS queue diagnosis tool."
 	echo
@@ -432,7 +442,8 @@ c_summary_none() {
 	- jobs running out of walltime 
 	- recently submitted jobs 
 	- summary of load on the cluster 
-	- your fairshare stats"
+	- your fairshare stats
+	(NOT FULLY IMPLEMENTED)"
 	#TODO ideas: fairShare, No of active nodes/processors, how many occupied by me
 	#Jobs that are going to run out of walltime soon
 
@@ -446,18 +457,18 @@ c_summary_none() {
 	echo "5 jobs with smallest walltime"
 
 	c_joblist_none
-
-
 }
 
 c_stats_id() {
-	help_string "display some job statistics"
+	help_string "display some job statistics
+	(NOT YET IMPLEMENTED)"
 	#echo stats called
 	echo $FUNCNAME called with args $@
 }
 
 c_wtincrease_id() {
-	help_string "increase walltime by sending sysadmin an email"
+	help_string "increase walltime by sending sysadmin an email
+	(NOT YET IMPLEMENTED)"
 	echo $FUNCNAME called with args $@
 }
 
@@ -477,195 +488,26 @@ c_top_node() {
 }
 
 c_delete_list() {
-	help_string "delete the jobs"
+	help_string "delete the jobs
+	(NOT YET IMPLEMENTED)"
 	#deleteJob
 	echo $FUNCNAME called with args $@
+
+	#read -p "Sure you want to delete job $ID?  " RES
+	#if [ "$RES" == "y" ]; then
+	#	qdel $ID
+	#fi
 }
 
 c_load_list() {
-	help_string "check load and memory usage"
+	help_string "check load and memory usage
+	(NOT YET IMPLEMENTED)"
 	#check the load and memory usage for this list of jobs
 	# (to see if one might be swapping)
 	echo $FUNCNAME called with args $@
 }
 
-#------------------------------------------------------------------------
-
-function displayHelp() {
-	cat << EOF
-The following commands are implemented at the moment:
-help              displays this help
-refresh           refresh qinvestigate display
-login <ID>        login to node
-top               login to node and execute "top"
-quit              quit script
-experimental      access experimental features.
-                  Read code for doc ;)
-
-shorter aliases:
-h       same as   help
-r                 refresh
-q                 quit
-l                 login
-
-NOTE: Major refactoring of this code is going on at the moment
-      the available methods are likely going to change very soon.
-EOF
-}
-
-#------------------------------------------------------------------------
-
-function deleteJob() {
-	read -p "Sure you want to delete job $ID?  " RES
-	if [ "$RES" == "y" ]; then
-		qdel $ID
-	fi
-}
-
-
-#------------------------------------------------------------------------
-
-PROMPT="Type in command followed by job ID  (h for help; q quits)  > "
-SUPRESS_QSTAT_ON_NEXT_RUN=0
-while true; do
-	if [ "$SUPRESS_QSTAT_ON_NEXT_RUN" != "1" ]; then
-		echo current jobs owned by you:
-		qstat -nu $USER | awk '$1 != "--"'
-		echo
-	else
-		SUPRESS_QSTAT_ON_NEXT_RUN=0
-	fi
-
-	#read input from user
-	ID=""
-	COMM=""
-	LINE=""
-	read -e -p "$PROMPT" LINE
-	history -s $LINE
-	PROMPT="comm ID  > " #shorten future promts
-
-	if [ "$LINE" == "" ]; then
-		#if [ "$QINVESTIGATE_DEFAULT_COMMAND" ]; then
-		#	LINE=$QINVESTIGATE_DEFAULT_COMMAND
-		#else
-			SUPRESS_QSTAT_ON_NEXT_RUN=1
-			continue
-		#fi
-	fi
-
-	COMM=`echo $LINE | awk '{print $1}'`
-	ID=`echo $LINE | awk '{print $2}'`
-
-	#do functions without an argument here:
-	case $COMM in 
-		r)
-			continue
-			;;
-		refresh)
-			continue
-			;;
-		experimental)
-			shell_loop
-			continue
-			;;
-		q)
-			exit 0
-			;;
-		quit)
-			exit 0
-			;;
-		exit)
-			exit 0
-			;;
-		h)
-			echo
-			displayHelp
-			SUPRESS_QSTAT_ON_NEXT_RUN=1
-			echo
-			continue
-			;;
-		help)
-			echo
-			displayHelp
-			SUPRESS_QSTAT_ON_NEXT_RUN=1
-			echo
-			continue
-			;;
-	esac
-	echo
-
-	#For all of the rest we need two arguments; if no second argument present try to default to single node if present.
-	if [ "$ID" == "" ]; then
-		QSTATUSER=`qstat -u $USER | grep $USER`
-		if [[ "$QSTATUSER" != "" && `echo $QSTATUSER | awk '{if (NR > 1) {exit}}; END {print NR}'` == 1 ]]; then
-			ID=`echo "$QSTATUSER" | awk '{print $1}'`
-		else
-			echo "!!!  Second argument missing  !!!"
-			echo "!!!  Type \"help\" for a list of commands  !!!"
-			SUPRESS_QSTAT_ON_NEXT_RUN=1
-			echo
-			continue
-		fi
-	fi
-
-	# check for valid node argument:
-	NODE=`qnodes | grep -B5 "$ID"`
-	if [ $? != "0" ]; then
-		echo "!!!  Sorry, could not find this host  !!!"
-		SUPRESS_QSTAT_ON_NEXT_RUN=1
-		echo
-		continue
-	fi
-	if [ `echo "$NODE" | awk '{if (NR > 7) {exit}}; END {print NR}'` -gt "7" ];then
-		echo "!!!  Sorry, more than one host did match your criteria  !!!"
-		SUPRESS_QSTAT_ON_NEXT_RUN=1
-		echo
-		continue
-	fi
-	NODE=`echo "$NODE" | head -n1`
-
-	#normalise ID input
-	GREPID=`qstat | grep $ID`
-	if [ `echo $GREPID | awk '{if (NR > 1) {exit}}; END {print NR}'` -gt 1 ]; then
-		echo "  WARNING: failed to normalised ID input $ID"
-		echo "           possible that some features like \"del\" don't work properly"
-		read -p "           Continue with execution?  " RES
-		if [ "$RES" != "y" ]; then
-			echo
-			SUPRESS_QSTAT_ON_NEXT_RUN=1
-			continue
-		fi
-	else
-		ID=`echo "$GREPID" | awk '{print $1}'`
-	fi
-
-	#do functions with argument here
-	case $COMM in
-		ssh)
-			c_login_node "$NODE" $ID
-			;;
-		login)
-			c_login_node "$NODE" $ID
-			;;
-		l)
-			c_login_node "$NODE" $ID
-			;;
-		llscratch)
-			c_login_node "$NODE" $ID
-			;;
-		lls)
-			c_login_node "$NODE" $ID
-			;;
-		top)
-			c_top_node "$NODE" $ID
-			;;
-
-	#-------------------------------------
-		*)
-			echo "!!!  Unrecognised command: $COMM  !!!"
-			echo "!!!  Type \"help\" for a list of commands  !!!"
-			SUPRESS_QSTAT_ON_NEXT_RUN=1
-			echo
-			continue
-	esac
-done
+#########################################################################
+#-- Start of script --#
+#######################
+shell_loop
