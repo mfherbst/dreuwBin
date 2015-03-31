@@ -29,6 +29,9 @@ fi
 #required for @( ) and ?( ) patterns in case ... and other pathname expansions
 shopt -qs extglob
 
+#TODO check for ssh agent and add key if not present
+#TODO module to parse user-defined aliases from config file
+
 #########################################################################
 #-- command cache --#
 #####################
@@ -67,6 +70,12 @@ list_commands_node() {
 	echo -n "$COMMANDS_NODE"
 }
 
+max_command_length(){
+	#get maximum number of characters a command has
+	fill_list_commands_cache
+	echo -n "$MAX_COMMAND_LENGTH"
+}
+
 fill_list_commands_cache() {
 	#fill cache for the lists of available commands
 	[ "$COMMANDS_NONE" ] && return
@@ -74,6 +83,8 @@ fill_list_commands_cache() {
 	COMMANDS_ID=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_id ().*/\1/p' | tr '\n' ' ')
 	COMMANDS_LIST=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_list ().*/\1/p' | tr '\n' ' ')
 	COMMANDS_NODE=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_node ().*/\1/p' | tr '\n' ' ')
+
+	MAX_COMMAND_LENGTH=`list_commands | tr ' ' '\n' | wc --max-line-length`
 }
 
 empty_list_commands_cache() {
@@ -81,14 +92,112 @@ empty_list_commands_cache() {
 	COMMANDS_ID=
 	COMMANDS_LIST=
 	COMMANDS_NODE=
+	MAX_COMMAND_LENGTH=
+}
+
+#########################################################################
+#-- utils --#
+#############
+
+help_string() {
+	#marker function that does absolutely nothing
+	:
+}
+
+print_help_for_command() {
+	#$1: command name
+	#$2: suffix
+
+	local FCTNAME="c_${1}_${2}"
+	local DECLARE
+	DECLARE=`declare -f -p $FCTNAME` || return 1
+	echo "$DECLARE" | sed -ne '/help_string/s/^.*help_string[[:space:]]*"\(.*\)";[[:space:]]*$/\1/p'
+	return 0
+}
+
+print_help_for_category() {
+	case "$1" in 
+		list)
+			EXTRA="<list>"
+			;;
+		id)
+			EXTRA="<id>  "
+			;;
+		none)
+			EXTRA="      "
+			;;
+		node)
+			EXTRA="<id>  "
+			;;
+		*)
+			echo "Cannot print help for unknown category $1"
+			return 1
+	esac
+
+	for cmd in `list_commands_$category`; do
+		local COLWIDTH=$(( $(max_command_length) + 6 - ${#cmd} ))
+		printf "   \033[0;33m%s\033[0;00m %-${COLWIDTH}s  %s\n" "$cmd" "$EXTRA" "$(print_help_for_command $cmd $category)"
+	done
 }
 
 #########################################################################
 #-- shell --#
 #############
 
+shell_loop() {
+	LASTJOBID=0
+	local RET=0
+
+	echo "Welcome to the interactive PBS queue diagnosis tool."
+	echo
+	c_summary_none
+	echo
+	echo "Enter 'help' for a list of implemented commands or 'quit' to quit the shell"
+
+	while true; do
+		if [ $RET != 0 ]; then
+			echo -e "rc: \033[0;32m$RET\033[0;00m"
+		fi
+
+		read -e -p "($(printf "%6s" "$LASTJOBID")) >" LINE
+		
+		if [ "$LINE" ]; then
+			history -s "$LINE"
+			run_command $LINE
+			RET=$?
+		fi
+	done
+}
+
+substitute_alias() {
+	#$1: command to expand
+	#$2: nesting count
+	#echos the expanded command on stdout, errors on stderr
+	
+	local NEST=${2:-0}
+	local CMD=$1
+	if ((NEST > 10)); then
+		echo "substitute_alias reached nest count of 10" >&2
+		echo "Executing command as is: $CMD" >&2
+		echo "$CMD"
+	fi
+
+	#TODO: modularise
+
+	case "$CMD" in
+		q)	substitute_alias "quit" "$((NEST+1))"
+			return
+			;;
+		*)	echo "$CMD"
+			return 
+			;;
+	esac
+}
+
 run_command() {
 	# interpret and run a command
+	# returns the return code of the function executed
+	# alters the global variable LASTJOBID
 	# $1: command
 	# $2 to $n: arguments
 
@@ -97,9 +206,14 @@ run_command() {
 	local NODE=""
 	local LIST=""
 	shift
+
+	[ -z "$CMD" ] && return 0
 	
 	#fill command if neccessary:
 	[ -z "$COMMANDS_NONE" ] && fill_list_commands_cache
+
+	#substitute aliases:
+	CMD=$(substitute_alias "$CMD")
 
 	#interpret the command:
 	case "$CMD" in
@@ -142,46 +256,75 @@ run_command() {
 #            - "_id"   for a single job id
 #            - "_list" for a list of job ids or a single job id.
 #            - "_node" if the job requires a node as the argument
-#      - they should contain a comment line starting with #HELP that
-#        documents the commands action shortly
+#      - they should contain a line with a help string starting with
+#        "help_string" that documents the commands action shortly
 #      - if the command requires a single job id to work the functions
 #        name has to 
 
-c_help_none() {
-	#HELP print this help
-	cat <<- EOF
-	The following commands are implemented:
-	EOF
+c_quit_none() {
+	help_string "Quit shell."
+	exit 0
+}
 
-	echo "#############"	
-	list_commands
-	echo
-	echo "#############"	
+c_help_none() {
+	help_string "print this help"
+
+
+	echo "The following commands are implemented:"
+	for category in none id node list; do
+		print_help_for_category $category
+	done
+
+	cat <<- EOF
+
+	<id> is a job id (or a pattern for it)
+	<list> is a list of job ids
+	EOF
+}
+
+c_summary_none() {
+	help_string "print a short summary"
+	#TODO ideas: fairShare, No of active nodes/processors, how many occupied by me
+	#Jobs that are going to run out of walltime soon
+	echo $FUNCNAME called
+}
+
+c_load_list() {
+	help_string "check load and memory usage"
+	#check the load and memory usage for this list of jobs
+	# (to see if one might be swapping)
+	echo $FUNCNAME called
 }
 
 c_login_node() {
-	#HELP login to the job's node and cd to TMPDIR
+	help_string "login to the job's node and cd to TMPDIR"
 	#llscratchNode
 	echo $FUNCNAME called
 }
 
 c_top_node() {
-	#HELP login to the job's node and call top
+	help_string "login to the job's node and call top"
 	#ltopNode
 	echo $FUNCNAME called
 }
 
 c_stats_id() {
-	#HELP display some job statistics
+	help_string "display some job statistics"
 	#echo stats called
 	echo $FUNCNAME called
 }
 
+c_wtincrease_id() {
+	help_string "increase walltime by sending sysadmin an email"
+	echo $FUNCNAME called
+}
+
 c_delete_list() {
-	#HELP delete the jobs
+	help_string "delete the jobs"
 	#deleteJob
 	echo $FUNCNAME called
 }
+
 
 
 #------------------------------------------------------------------------
@@ -213,8 +356,7 @@ EOF
 #------------------------------------------------------------------------
 
 function callExperimental() {
-	shift
-	run_command $@
+	shell_loop
 }
 
 function loginNode() {
