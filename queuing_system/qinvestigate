@@ -96,8 +96,8 @@ empty_list_commands_cache() {
 }
 
 #########################################################################
-#-- utils --#
-#############
+#-- printing help --#
+#####################
 
 help_string() {
 	#marker function that does absolutely nothing
@@ -111,7 +111,40 @@ print_help_for_command() {
 	local FCTNAME="c_${1}_${2}"
 	local DECLARE
 	DECLARE=`declare -f -p $FCTNAME` || return 1
-	echo "$DECLARE" | sed -ne '/help_string/s/^.*help_string[[:space:]]*"\(.*\)";[[:space:]]*$/\1/p'
+	echo "$DECLARE" | awk '
+		BEGIN { pr=0 }
+		/help_string/ && /";[[:space:]]*$/ {
+			# a single line help. Just print it all.
+			gsub(/^.*help_string[[:space:]]*"/,"")
+			gsub(/";[[:space:]]*$/,"")
+			print
+			exit 0
+		}
+
+		/help_string/ {
+			#beginning of the help: set flag to print other lines and remove unneccessary stuff.
+			gsub(/^.*help_string[[:space:]]*"/,"")
+			print
+			pr=1
+			next
+		}
+		
+		/";[[:space:]]*$/ {
+			#end of the help. Print last bit and exit
+			gsub(/^[[:space:]]*/,"")
+			gsub(/";[[:space:]]*$/,"")
+			print
+			pr=0
+			exit 0
+		}
+		
+		pr==1 {
+			#line in between: Remove leading space
+			gsub(/^[[:space:]]*/,"")
+			print
+			next
+		}
+	'
 	return 0
 }
 
@@ -134,10 +167,82 @@ print_help_for_category() {
 			return 1
 	esac
 
+	#The amount of witespace we need for the lines (for multiline help) to be aligned:
+	WHITE=$(printf "%$(( $(max_command_length) + 12 ))s" "")
 	for cmd in `list_commands_$category`; do
+		#width of the extra column (for alignment of first help line)
 		local COLWIDTH=$(( $(max_command_length) + 6 - ${#cmd} ))
-		printf "   \033[0;33m%s\033[0;00m %-${COLWIDTH}s  %s\n" "$cmd" "$EXTRA" "$(print_help_for_command $cmd $category)"
+		printf "   \033[0;33m%s\033[0;00m %-${COLWIDTH}s  " "$cmd" "$EXTRA"
+
+		print_help_for_command $cmd $category | sed "2,\$s/^/$WHITE/g"
 	done
+}
+
+#########################################################################
+#-- utils --#
+#############
+
+match_for_jobs() {
+	# Tries to match the argument on $1 against the list of JobIDs 
+	# and the list of jobnames of this user. 
+	# Echos all matching jobids in the list form "jobid1 jobid2 jobid3"
+	# If one or more IDs match returns 0, else 1
+
+	[ -z "$1" ] && return 1
+	qstat  -1 -n -u $USER | awk -v "pattern=$1" -v "user=$USER" '
+		BEGIN {ret=1}
+		$2 == user && ($1 ~ pattern || $4 ~ pattern) { printf "%s ", $1; ret=0 }
+		END {print ""; exit ret}
+	'
+}
+
+print_jobs() {
+	#$@: a list of job ids
+	qstat -u $USER $@
+}
+
+node_for_jobid() {
+	# Expects a single jobid and echos the corresponding node.
+	# returns 1 on any error, 0 on success.
+
+	[ -z "$1" ] && return 1
+	qstat  -1 -n "$1" | awk -v "user=$USER" -v "id=$1" '
+		$2 == user {
+			#get rid of /procnumber:
+	       		gsub(/\/[0-9]+/,"",$12);
+
+			#split at the +	
+			split($12,a,"+")
+			
+			#check if all the same node
+			node=a[1];
+			for (ind in a) {
+				if (a[ind] != node) {
+					print("Found multiple nodes for jobid " id) > "/dev/stderr"
+					exit 1
+				}
+			}
+			print node
+			exit 0
+		}
+	'
+}
+
+parse_job_args() {
+	# parses all job args on $@ and echos a list of all matching job ids
+	# If one or more IDs match returns 0, else 1
+
+	local LIST=""
+	while [ "$1" ]; do
+		LIST="$LIST $(match_for_jobs $1)"
+		shift
+	done
+	LIST=$(echo "$LIST" | sed 's/[[:space:]]+/ /g;s/^ //;s/ $//g')
+	if [ -z "$LIST" ]; then
+		return 1
+	fi
+	echo "$LIST"
+	return 0
 }
 
 #########################################################################
@@ -145,7 +250,7 @@ print_help_for_category() {
 #############
 
 shell_loop() {
-	LASTJOBID=0
+	LASTJOBID=""
 	local RET=0
 
 	echo "Welcome to the interactive PBS queue diagnosis tool."
@@ -197,14 +302,12 @@ substitute_alias() {
 run_command() {
 	# interpret and run a command
 	# returns the return code of the function executed
-	# alters the global variable LASTJOBID
+	# reads and alters the global variable LASTJOBID via __rc_echo_joblist
 	# $1: command
 	# $2 to $n: arguments
 
 	local CMD="$1"
-	local ID=""
-	local NODE=""
-	local LIST=""
+	local LIST
 	shift
 
 	[ -z "$CMD" ] && return 0
@@ -215,7 +318,8 @@ run_command() {
 	#substitute aliases:
 	CMD=$(substitute_alias "$CMD")
 
-	#interpret the command:
+	#categorise the command and interpret (in case it is a _none)
+	local CMD_CATEGORY="none"
 	case "$CMD" in
 		#the @( ) and ?( ) patterns require extglob !!
 		@(${COMMANDS_NONE// /|})?(+([[:space:]])*))
@@ -223,26 +327,60 @@ run_command() {
 			return $?
 			;;
 		@(${COMMANDS_ID// /|})?(+([[:space:]])*))
-			#TODO: determine id from remaining args
-			c_${CMD}_id "$ID"
-			return $?
+			CMD_CATEGORY="id"
 			;;
 		@(${COMMANDS_NODE// /|})?(+([[:space:]])*))
-			#TODO: determine node from remaining args
-			c_${CMD}_node "$NODE"
-			return $?
+			CMD_CATEGORY="node"
 			;;
 		@(${COMMANDS_LIST// /|})?(+([[:space:]])*))
-			#TODO: determine id list from remaining args
-			c_${CMD}_list "$LIST"
-			return $?
+			CMD_CATEGORY="list"
 			;;
 		*)
-			 echo "Unrecognised command: $CMD"
-			 echo "Type help for a list of commands"
+			 echo "Unrecognised command: $CMD" >&2
+			 echo "Type help for a list of commands" >&2
 			 return 1
 			 ;;
 	esac
+	
+	#all categories need the list of job ids:
+	if ! LIST=$(parse_job_args $@); then
+		if [ "$LASTJOBID" ]; then
+			LIST=$LASTJOBID
+		else
+			echo "No argument provided or no job matched" >&2
+			return 1
+		fi
+	fi
+
+	#if more than one match and category is not list, then tell user and exit
+	if [ $(echo "$LIST" | wc -w) == 1 ]; then
+		#in any case we will proceed => update LASTJOBID
+		LASTJOBID="$LIST"
+	elif [ "$CMD_CATEGORY" == "list" ]; then
+		#here we proceed with multiple job ids
+		LASTJOBID=""
+	else
+		#for all categories but list we need (but do not have) a unique ID
+		echo "More than one job matched the pattern:" >&2
+		print_jobs "$LIST" > /dev/stderr
+		return 1
+	fi
+
+	#parse node and run
+	local NODE
+	if [ "$CMD_CATEGORY" == "node" ]; then
+		if ! NODE=$(node_for_jobid "$LIST");then
+			echo "Error finding node for jobid: $LIST" >&2
+			return 1
+		fi
+		#run node command:
+		c_${CMD}_node "$NODE" "$LIST"
+		return $?
+	fi
+
+	#run all remaining commands:
+	c_${CMD}_${CMD_CATEGORY} "$LIST"
+	return $?
 }
 
 
@@ -254,8 +392,9 @@ run_command() {
 #        command requires:
 #            - "_none" for no argument 
 #            - "_id"   for a single job id
-#            - "_list" for a list of job ids or a single job id.
-#            - "_node" if the job requires a node as the argument
+#            - "_list" for a list of job ids.
+#            - "_node" for the node as the first arg 
+#                      and the job id as the second argument
 #      - they should contain a line with a help string starting with
 #        "help_string" that documents the commands action shortly
 #      - if the command requires a single job id to work the functions
@@ -268,7 +407,7 @@ c_quit_none() {
 
 c_help_none() {
 	help_string "print this help"
-
+	#TODO
 
 	echo "The following commands are implemented:"
 	for category in none id node list; do
@@ -277,55 +416,78 @@ c_help_none() {
 
 	cat <<- EOF
 
-	<id> is a job id (or a pattern for it)
-	<list> is a list of job ids
+	<id> is a job id or jobname (or a pattern for it)
+	<list> is a list of job ids or same as <id>
+	if pattern is not unique, the command only works for <list>
 	EOF
 }
 
+c_joblist_none() {
+	help_string "print all jobs owned by $USER"
+	qstat -nu $USER
+}
+
 c_summary_none() {
-	help_string "print a short summary"
+	help_string "print a short summary including 
+	- jobs running out of walltime 
+	- recently submitted jobs 
+	- summary of load on the cluster 
+	- your fairshare stats"
 	#TODO ideas: fairShare, No of active nodes/processors, how many occupied by me
 	#Jobs that are going to run out of walltime soon
-	echo $FUNCNAME called
+
+	#Print 10 jobs of importance
+	#
+	#qstat -1 -n -u $USER | awk
+
+
+	echo "5 joungest jobs"
+
+	echo "5 jobs with smallest walltime"
+
+	c_joblist_none
+
+
+}
+
+c_stats_id() {
+	help_string "display some job statistics"
+	#echo stats called
+	echo $FUNCNAME called with args $@
+}
+
+c_wtincrease_id() {
+	help_string "increase walltime by sending sysadmin an email"
+	echo $FUNCNAME called with args $@
+}
+
+c_login_node() {
+	help_string "login to the job's node and set the working directory
+	to be the job's TMPDIR (ie the location under /lscratch"
+	local NODE="$1"
+	local ID="$2"
+	ssh -t "$NODE" "cd /lscratch/$ID; bash -il"
+}
+
+c_top_node() {
+	help_string "login to the job's node and call top"
+	local NODE="$1"
+	local ID="$2"
+	ssh -t $NODE "top"
+}
+
+c_delete_list() {
+	help_string "delete the jobs"
+	#deleteJob
+	echo $FUNCNAME called with args $@
 }
 
 c_load_list() {
 	help_string "check load and memory usage"
 	#check the load and memory usage for this list of jobs
 	# (to see if one might be swapping)
-	echo $FUNCNAME called
+	echo $FUNCNAME called with args $@
 }
-
-c_login_node() {
-	help_string "login to the job's node and cd to TMPDIR"
-	#llscratchNode
-	echo $FUNCNAME called
-}
-
-c_top_node() {
-	help_string "login to the job's node and call top"
-	#ltopNode
-	echo $FUNCNAME called
-}
-
-c_stats_id() {
-	help_string "display some job statistics"
-	#echo stats called
-	echo $FUNCNAME called
-}
-
-c_wtincrease_id() {
-	help_string "increase walltime by sending sysadmin an email"
-	echo $FUNCNAME called
-}
-
-c_delete_list() {
-	help_string "delete the jobs"
-	#deleteJob
-	echo $FUNCNAME called
-}
-
-
 
 #------------------------------------------------------------------------
 
@@ -336,14 +498,12 @@ help              displays this help
 refresh           refresh qinvestigate display
 login <ID>        login to node
 top               login to node and execute "top"
-delete <ID>       delete job
 quit              quit script
 experimental      access experimental features.
                   Read code for doc ;)
 
 shorter aliases:
-del     same as   delete
-h                 help
+h       same as   help
 r                 refresh
 q                 quit
 l                 login
@@ -354,22 +514,6 @@ EOF
 }
 
 #------------------------------------------------------------------------
-
-function callExperimental() {
-	shell_loop
-}
-
-function loginNode() {
-	ssh $NODE
-}
-
-function llscratchNode() {
-	ssh -t $NODE "cd /lscratch/$ID; bash -il"
-}
-
-function ltopNode() {
-	ssh -t $NODE "top"
-}
 
 function deleteJob() {
 	read -p "Sure you want to delete job $ID?  " RES
@@ -421,9 +565,7 @@ while true; do
 			continue
 			;;
 		experimental)
-			callExperimental $LINE
-			SUPRESS_QSTAT_ON_NEXT_RUN=1
-			echo
+			shell_loop
 			continue
 			;;
 		q)
@@ -500,22 +642,22 @@ while true; do
 	#do functions with argument here
 	case $COMM in
 		ssh)
-			llscratchNode
+			c_login_node "$NODE" $ID
 			;;
 		login)
-			llscratchNode
+			c_login_node "$NODE" $ID
 			;;
 		l)
-			llscratchNode
+			c_login_node "$NODE" $ID
 			;;
 		llscratch)
-			llscratchNode
+			c_login_node "$NODE" $ID
 			;;
 		lls)
-			llscratchNode
+			c_login_node "$NODE" $ID
 			;;
 		top)
-			ltopNode
+			c_top_node "$NODE" $ID
 			;;
 
 	#-------------------------------------
@@ -527,4 +669,3 @@ while true; do
 			continue
 	esac
 done
-
