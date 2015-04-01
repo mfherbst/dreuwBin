@@ -1,44 +1,141 @@
 #!/bin/bash
 
-#TODO: move this block down to preliminary checks or so
-if [ `hostname` != "ccserv1" ]; then
-	echo "Sorry wrong host, please use ccserv1 to run this"
-	exit 1
-fi
+MASTERHOSTNAME="ccserv1"
 
-if [ "$1" = "-h" ]; then
-	cat << EOF
-Toolkit to investigate and modify queue jobs efficiently.
-For a list of implemented commands start the Skript and type "help".
-
-Skript makes use of the variable \$USER to execute fiters on the queue, 
-so changing this variable in the shell makes it work under a different
-username. Logins still work under the name of current user, however.
-
-Basic tab completion is available.
-EOF
-	exit 0
-fi
-
-#Is there even a job in the queue
-if qstat -u $USER | grep $USER > /dev/null; then
-	#all fine
-	:
-else
-	echo "!!!   You currently have no job in the queue; Terminating   !!!"
-	exit 0
-fi
-
-#required for @( ) and ?( ) patterns in case ... and other pathname expansions
+#set this to allow @( ) and ?( ) patterns in case ... and other pathname expansions
 shopt -qs extglob
 
-# switch to vi line editing mode for the binding of \t to tabcomplete to work
-# TODO offer options for vi vs emacs
-set -o vi
-set +o emacs
+#switch to vi or emacs line editing mode
+#(needed to allow the binding of \t to "tabcomplete" and hence tab completion)
+if set -o | awk '$1 == "emacs" { if ($2 =="off") exit 0; exit 1}'; then
+	#no emacs editing mode, hence
+	set -o vi
+else
+	set +o vi
+fi
 
-#TODO check for ssh agent and add key if not present
 #TODO module to parse user-defined aliases from config file
+#TODO module for config file with MASTERHOSTNAME, ADDSSHKEY
+
+#########################################################################
+#-- checks and setup --#
+########################
+
+cleanup_before_exit() {
+	# function to be called in a trap before 
+	# exiting the script
+
+	#remove ssh key in case we added it
+	[ "$ADDED_SSH_KEY" ] && ssh-add -d
+}
+
+preliminary_checks() {
+	#function to be called to set up the environment
+
+	# check host
+	if [[ "$HOSTNAME" != "$MASTERHOSTNAME" ]]; then
+		echo "Sorry wrong host, please use $MASTERHOSTNAME to run this."
+		exit 1
+	fi
+	
+	# check if job in queue
+	if ! qstat -u $USER | grep -q $USER; then
+		echo "You currently have no job in the queue"
+		exit 0
+	fi
+} && preliminary_checks
+
+user_has_ssh_key() {
+	#determine if the user has an ssh key
+
+	# here we assume the keys are at the default location
+	# ie.
+	local KEYLOC="$HOME/.ssh/"
+	for key in $KEYLOC/id_{rsa,dsa,ecdsa,ed25519}; do
+		[ -r "$key" ] && return 0
+	done
+	return 1
+}
+
+setup_ssh_keys() {
+	# function that checks for an ssh-agent
+	# and adds the users ssh key
+
+	# check if user has an ssh agent
+	if ! ps x -U $USER | grep -q "[s]sh-agent"; then
+		cat <<- EOF
+		WARNING: No running ssh-agent found
+		Currently there is no ssh-agent running for your user on this host.
+		This implies that you will have to type your password each time this
+		script needs to login to one of the nodes.
+		For some commands this can be quite tedious, so the use of an 
+		ssh-agent is highly recommended.
+
+		EOF
+		sleep 3
+		return 1
+	fi
+
+	# check for keys in ssh-add that is added
+	ssh-add -l &> /dev/null && return 0
+
+	# see if user has key to add
+	if ! user_has_ssh_key; then
+		cat <<- EOF
+		WARNING: No ssh public key found
+		Currently there is no ssh public key found in your HOME/.ssh folder
+		Please generate a key using "ssh-keygen" or (if your key is not 
+		at the default location) add it manually to the agent.
+
+		If you have no clue what this means, most probably the first thing
+		is the case and I suggest you read the manpage of ssh-keygen ;)
+
+		EOF
+		sleep 3
+		return 1
+	fi
+
+	# add user key
+	echo Please enter your password to add the ssh key to your agent:
+	if ssh-add; then
+		trap cleanup_before_exit EXIT
+		return 0
+	else
+		echo WARNING: could not add ssh key
+		echo
+		return 1
+	fi
+}
+
+script_usage() {
+	# help to print if script is called with -h or --help
+
+	cat <<- EOF
+	$(basename $0) [<Options>] [ [ -- ] <qinvestigate command> [ <args> ] ]
+
+	Toolkit to investigate and modify PBS jobs efficiently.
+	For a list of implemented commands start the script and type "help" or
+	run $(basename $0) help.
+
+	All arguments after the -- or that are left after the options are parsed
+	are interpreted as internal qinvestigate commands and their arguments.
+
+	Available <Options>:
+	   --add-sshkey        enable or disable the check for a running ssh-agent
+	   --no-add-sshkey     available keys and the automatic querying for a
+	                       password to add the key to your agent.
+	
+	Features of the shell:
+	The shell has basic tab completion and tries to match jobs according
+	to both JOB ID and JOB name whereever a command requires an <ID> or 
+	a <list>.
+
+	The script makes use of the environment variable \$USER to filter out
+	the relevant lists for the current user.
+EOF
+
+
+}
 
 #########################################################################
 #-- command cache --#
@@ -573,7 +670,8 @@ c_wtincrease_id() {
 
 c_login_node() {
 	help_string "login to the job's node and set the working directory
-	to be the job's TMPDIR (ie the location under /lscratch"
+	to be the job's TMPDIR (ie the location under /lscratch
+	Make sure to configure the .ssh/config that a simple ssh node is enough."
 	local NODE="$1"
 	local ID="$2"
 	ssh -t "$NODE" "cd /lscratch/$ID; bash -il"
@@ -609,4 +707,45 @@ c_load_list() {
 #########################################################################
 #-- Start of script --#
 #######################
+
+ADDSSHKEY=y
+while [ "$1" ]; do
+	case "$1" in
+		-h|--help)
+			script_usage 
+			exit 0
+			;;
+		--add-sshkey)
+			ADDSSHKEY=y
+			;;
+		--no-add-sshkey)
+			ADDSSHKEY=n
+			;;
+		--)
+			shift
+			break
+			;;
+		-*)
+			echo "Unrecognised commandline argument: $1" >&2
+			echo "Run $(basename $0) -h for help." >&2
+			exit 1
+			;;
+		*)
+			break
+			;;
+	esac
+	shift
+done
+
+#setup ssh keys
+[ "$ADDSSHKEY" == "y" ] && setup_ssh_keys
+
+if [ "$1" ]; then
+	# There is stuff left on the commandline
+	# => presumably the user does not want to run a shell
+	#    but execute the command directly
+	run_command $@
+	exit $?
+fi
+
 shell_loop
