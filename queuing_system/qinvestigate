@@ -14,6 +14,8 @@ For a list of implemented commands start the Skript and type "help".
 Skript makes use of the variable \$USER to execute fiters on the queue, 
 so changing this variable in the shell makes it work under a different
 username. Logins still work under the name of current user, however.
+
+Basic tab completion is available.
 EOF
 	exit 0
 fi
@@ -29,6 +31,11 @@ fi
 
 #required for @( ) and ?( ) patterns in case ... and other pathname expansions
 shopt -qs extglob
+
+# switch to vi line editing mode for the binding of \t to tabcomplete to work
+# TODO offer options for vi vs emacs
+set -o vi
+set +o emacs
 
 #TODO check for ssh agent and add key if not present
 #TODO module to parse user-defined aliases from config file
@@ -250,16 +257,97 @@ parse_job_args() {
 #-- shell --#
 #############
 
+# GLOBAL variable containing the last execution time of tabcomplete
+# where only a partial completion of the command was achieved
+TAB_PARTIAL_LASTEXEC=0
+tabcomplete() {
+	# try to complete the READLINE_LINE
+	
+	# discard tab if no input on line
+	[ -z "$READLINE_LINE" ] && return
+
+	# remove leading whitespace:
+	local NORMALISED="${READLINE_LINE##*( )}" #requires extglob again
+
+	# if NORMALISED contains a space, we are already completing the args
+	# => quit
+	[[ $NORMALISED == *" "*  ]] && return
+	#TODO completion for arguments
+
+	# try to match command. If no match -> return
+	local MATCHES
+	MATCHES=$(list_commands | tr ' ' '\n' | grep "^$NORMALISED") || return
+
+	# find longest substring in matches:
+	local LONGCOMMON
+	# In the awk script we go through all matches and determine
+	# the longest common sequence of characters at the start of
+	# all matches
+	LONGCOMMON=`echo "$MATCHES" | awk '
+		function commonstart(a,b) {
+			# function to determine the longest sequence of characters
+			# that starts both strings
+
+			#determine minimum length of both strings
+			len=length(a)
+			if (length(b) < len) {
+				len=length(b)
+			}
+
+			#determine longest common start:
+			for(i = 1; i <= len; ++i) {
+				if ( substr(a,i,1) != substr(b,i,1) ) {
+					return substr(a,0,i-1)
+				}
+			}
+			return substr(a,0,len)
+		}
+	
+		BEGIN {comm="" };
+		NR == 1 { comm=$0; next };
+		NR > 1 { comm=commonstart(comm,$0); };
+		END { print comm }
+		'
+	`
+	
+	if [[ $(echo -n "$MATCHES" | grep -c '^') == 1 ]]; then
+		#single match: Tab complete
+		READLINE_LINE="$MATCHES "
+		READLINE_POINT=$(( ${#MATCHES} + 1))
+		return
+	fi
+
+	# fill up to common chars:
+	READLINE_LINE="$LONGCOMMON"
+	READLINE_POINT=${#MATCHES}
+
+	# pressed tab twice within 3 seconds
+	if (( $(date +%s) - TAB_PARTIAL_LASTEXEC < 4  )); then
+		#print list of matching commands
+		echo -n "$MATCHES" | tr '\n' '   '
+		echo
+	fi
+	TAB_PARTIAL_LASTEXEC=$(date +%s)
+	return
+}
+
 shell_loop() {
 	local RET=0
 
 	#if only one job, than select it here, else empty
 	LASTJOBID=`qstat -u $USER | awk -v "user=$USER" '
+		BEGIN { ret=0 }
 		$2 == user { 
-			if (id != "") { exit 1 }; 
+			if (id != "") { ret=1; exit }; 
 			id=$1
 	      	}
-		END { print id; exit 0 }
+		END { 
+			if (ret==0) {
+				print id; 
+				exit 0
+			}
+			exit 1
+		}
 		'
 	`
 
@@ -273,6 +361,9 @@ shell_loop() {
 		if [ $RET != 0 ]; then
 			echo -e "rc: \033[0;32m$RET\033[0;00m"
 		fi
+
+		#tab completion with function tabcomplete:
+		bind -x '"\t":"tabcomplete"';
 
 		read -e -p "($(printf "%6s" "$LASTJOBID")) >" LINE
 		
@@ -417,7 +508,7 @@ c_quit_none() {
 
 c_help_none() {
 	help_string "print this help"
-	#TODO
+	#TODO improve and expand
 
 	echo "The following commands are implemented:"
 	for category in none id node list; do
@@ -430,6 +521,14 @@ c_help_none() {
 	<list> is a list of job ids or same as <id>
 	if pattern is not unique, the command only works for <list>
 	EOF
+}
+
+c_alias_none() {
+	help_string "List defined aliases
+	(NOT YET IMPLEMENTED)"
+	#TODO implement
+
+	echo $FUNCNAME called with args $@
 }
 
 c_joblist_none() {
