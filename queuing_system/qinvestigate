@@ -1,6 +1,12 @@
 #!/bin/bash
 
-MASTERHOSTNAME="ccserv1"
+# load library:
+. $(dirname $0)/../shared.config.lib.sh
+
+##########################################################################
+#Settings
+DEVELOPER="info@michael-herbst.com" #main developer of this script
+WARNINGWAIT=2 #number of seconds to wait if a warning is issued
 
 #set this to allow @( ) and ?( ) patterns in case ... and other pathname expansions
 shopt -qs extglob
@@ -13,9 +19,6 @@ if set -o | awk '$1 == "emacs" { if ($2 =="off") exit 0; exit 1}'; then
 else
 	set +o vi
 fi
-
-#TODO module to parse user-defined aliases from config file
-#TODO module for config file with MASTERHOSTNAME, ADDSSHKEY
 
 #########################################################################
 #-- checks and setup --#
@@ -34,7 +37,7 @@ preliminary_checks() {
 
 	# check host
 	if [[ "$HOSTNAME" != "$MASTERHOSTNAME" ]]; then
-		echo "Sorry wrong host, please use $MASTERHOSTNAME to run this."
+		echo "Sorry wrong host, please use host $MASTERHOSTNAME to run this."
 		exit 1
 	fi
 	
@@ -43,7 +46,7 @@ preliminary_checks() {
 		echo "You currently have no job in the queue"
 		exit 0
 	fi
-} && preliminary_checks
+}
 
 user_has_ssh_key() {
 	#determine if the user has an ssh key
@@ -72,7 +75,7 @@ setup_ssh_keys() {
 		ssh-agent is highly recommended.
 
 		EOF
-		sleep 3
+		sleep $WARNINGWAIT
 		return 1
 	fi
 
@@ -91,7 +94,7 @@ setup_ssh_keys() {
 		is the case and I suggest you read the manpage of ssh-keygen ;)
 
 		EOF
-		sleep 3
+		sleep $WARNINGWAIT
 		return 1
 	fi
 
@@ -102,6 +105,7 @@ setup_ssh_keys() {
 		return 0
 	else
 		echo WARNING: could not add ssh key
+		sleep $WARNINGWAIT
 		echo
 		return 1
 	fi
@@ -115,7 +119,7 @@ script_usage() {
 
 	Toolkit to investigate and modify PBS jobs efficiently.
 	For a list of implemented commands start the script and type "help" or
-	run $(basename $0) help.
+	run "$(basename $0) --no-add-sshkey help".
 
 	All arguments after the -- or that are left after the options are parsed
 	are interpreted as internal qinvestigate commands and their arguments.
@@ -132,14 +136,148 @@ script_usage() {
 
 	The script makes use of the environment variable \$USER to filter out
 	the relevant lists for the current user.
+
+	Bugs / Suggestions / Feature Requests:
+	      $DEVELOPER
 EOF
 
 
 }
 
 #########################################################################
+#-- config management --#
+#########################
+
+default_config() {
+	# spits out the default configuration
+
+	cat <<- EOF
+	# The systax of all options is 
+	# <OPTIONNAME> = "<OPTIONVALUE>"
+	# Both spaces around the = as well as the " around the
+	# <OPTIONVALUE> are optional. 
+	# 
+	# <OPTIONVALUE> may not continue any of the three characters
+	#  " = '
+
+	main {
+		# The hostname on which the PBS system runs:
+		MASTERHOSTNAME="$MASTERHOSTNAME"
+
+		# Should the script check for a running ssh agent
+		# and if the users ssh key is added
+		# default is yes
+		ADDSSHKEY="$ADDSSHKEY"
+
+		# Absolute number of hours of remaining walltime below which
+	       	# job is considered to be running out of walltime very soon.
+		WALLTIME_WARNING_ABS=$WALLTIME_WARNING_ABS
+
+		# Relative percentage of remaining walltime below which
+		# job is considered to be running out of walltime very soon.
+		WALLTIME_WARNING_REL=$WALLTIME_WARNING_REL
+
+	}
+
+	aliases {
+		# Type in this block the aliases for the qinvestigate shell
+		# The syntax is (similar to bash): 
+		#   alias <SHORT FORM>="<LONG FORM>"
+		# for example consider
+		#   alias l="login"
+		# which binds l as an alias for login
+		# The <LONG FORM> may not contain any of the three characters
+		# = " '
+		#
+		# examples:
+		#alias q="quit"
+		#alias l="login"
+	}
+	EOF
+}
+
+parse_config() {
+	#Parse mainblock	
+	ConfigParseBlock "main" $ALLGLOBALSETTINGS
+	case "$?" in
+		2)
+			echo "main block missing in config file `ConfigPath`" >&2
+			echo "Please add at least an empty block \"main {}\"" >&2
+			exit 1
+			;;
+		8)
+			echo "The main block of `ConfigPath` contained invalid config options." >&2
+			exit 1
+			;;
+		0)
+			#All fine
+			:
+			;;
+		*)	#No Config yet present
+			#Dump default:
+			default_config | ConfigPut
+			echo "NOTICE: Default config dumped in file `ConfigPath`"
+			sleep $WARNINGWAIT
+			parse_config
+		       	return $?
+			;;
+	esac
+
+	#read and parse alias block
+	local ALIASESBLOCK
+	if ALIASESBLOCK=`ConfigGetBlock "aliases"`; then
+		# parse the alias block into a sequence of commands
+		# ALIASES["q"]="quit"
+		# ALIASES["l"]="login"
+		# ...
+		# that will then be evaluated by the shell
+		# ignore all entries that are invalid or may cause problems
+		# when the shell evals the result
+		# (ie those which contain = or ' or " in the string on the RHS of =)
+		local ALIASCODE
+		if ! ALIASCODE=$(
+			echo -n "$ALIASESBLOCK" | awk "
+				BEGIN {
+					res=0 #return value
+				}
+
+				/^alias[[:space:]]+[[:graph:]]+=\\\"[^=\\\"']+\\\"$/ {
+					split(\$2,a,\"=\")
+					sub(/^\"/,\"\",a[2])
+					sub(/\"$/,\"\",a[2])
+					print \"ALIASES[\\\"\" a[1] \"\\\"]='\" a[2] \"'\"
+					next
+				}
+
+				{
+					print \"Invalid alias definition: \" \$0  > \"/dev/stderr\"
+					res=1
+					next
+				}
+
+				END {
+					exit res
+				}
+			"
+		); then
+			echo "WARNING: Some entries of the alias block in `ConfigPath` were ignored." >&2
+			sleep $WARNINGWAIT
+		fi
+		eval "$ALIASCODE"
+	fi
+}
+
+#########################################################################
 #-- command cache --#
 #####################
+
+list_commands_aliases() {
+	#list all commands and aliases
+	list_commands
+	echo -n " "
+	echo -n "${!ALIASES[@]}"
+}
+
 list_commands() {
 	#list all commands
 	list_commands_none
@@ -373,7 +511,7 @@ tabcomplete() {
 
 	# try to match command. If no match -> return
 	local MATCHES
-	MATCHES=$(list_commands | tr ' ' '\n' | grep "^$NORMALISED") || return
+	MATCHES=$(list_commands_aliases | tr ' ' '\n' | grep "^$NORMALISED") || return
 
 	# find longest substring in matches:
 	local LONGCOMMON
@@ -483,12 +621,14 @@ substitute_alias() {
 		echo "substitute_alias reached nest count of 10" >&2
 		echo "Executing command as is: $CMD" >&2
 		echo "$CMD"
+		return
 	fi
 
-	#TODO: modularise
-
+	local ALIASES_INDICES=${!ALIASES[@]}
 	case "$CMD" in
-		q)	substitute_alias "quit" "$((NEST+1))"
+		#the @( ) and ?( ) patterns require extglob !!
+		@(${ALIASES_INDICES// /|}))
+			substitute_alias "${ALIASES[$CMD]}" "$((NEST+1))"
 			return
 			;;
 		*)	echo "$CMD"
@@ -595,8 +735,6 @@ run_command() {
 #                      and the job id as the second argument
 #      - they should contain a line with a help string starting with
 #        "help_string" that documents the commands action shortly
-#      - if the command requires a single job id to work the functions
-#        name has to 
 
 c_quit_none() {
 	help_string "Quit shell."
@@ -617,15 +755,19 @@ c_help_none() {
 	<id> is a job id or jobname (or a pattern for it)
 	<list> is a list of job ids or same as <id>
 	if pattern is not unique, the command only works for <list>
+
+	
+	Bugs / Suggestions / Feature Requests:
+	      $DEVELOPER
 	EOF
 }
 
 c_alias_none() {
-	help_string "List defined aliases
-	(NOT YET IMPLEMENTED)"
-	#TODO implement
-
-	echo $FUNCNAME called with args $@
+	help_string "List defined aliases"
+	local ALIASES_INDICES=${!ALIASES[@]}
+	for ind in $ALIASES_INDICES; do 
+		echo "alias $ind=\"${ALIASES[$ind]}\""
+	done	
 }
 
 c_joblist_none() {
@@ -648,25 +790,50 @@ c_summary_none() {
 	#qstat -1 -n -u $USER | awk
 
 
-	echo "5 joungest jobs"
+	#echo "5 joungest jobs"
 
-	echo "5 jobs with smallest walltime"
+	#echo "5 jobs with smallest walltime"
 
 	c_joblist_none
+
+	# WALLTIME_WARNING_ABS=5  #hours
+	# WALLTIME_WARNING_REL=10 #%
+
+	echo "Fairshare line and place:"
+	diagnose -f | awk -v "user=$USER" '
+		BEGIN { pr=0 }
+		pr > 0 && /^$/ { exit }
+	       	pr==1 && /^-------------$/ { pr=2; next };
+	       	pr == 0 && /^USER$/ { pr=1; next }
+		pr == 2 { arr[$1]=$2; }
+		pr == 2 && $0 ~ "^" user "\\*? " { userline=$0 ; user=$1; next }
+		END { 
+			n = asort(arr,sorted)
+			i=1
+			for(;i <=n;++i) { if(sorted[i] == arr[user]) break; }
+			gsub("^" user,user " (" n-i+1 "th)",userline)
+
+			#TODO make this better:
+			print "FSInterval                %     Target       0       1       2"
+			print "FSWeight               ------- -------  1.0000  0.5000  0.2500"
+
+			print userline 
+		}
+	'
 }
 
-c_stats_id() {
-	help_string "display some job statistics
-	(NOT YET IMPLEMENTED)"
-	#echo stats called
-	echo $FUNCNAME called with args $@
-}
+#c_stats_id() {
+#	help_string "display some job statistics"
+#
+#	echo $FUNCNAME called with args $@
+#	#TODO
+#}
 
-c_wtincrease_id() {
-	help_string "increase walltime by sending sysadmin an email
-	(NOT YET IMPLEMENTED)"
-	echo $FUNCNAME called with args $@
-}
+#c_wtincrease_id() {
+#	help_string "increase walltime by sending sysadmin an email"
+#	echo $FUNCNAME called with args $@
+#	#TODO
+#}
 
 c_login_node() {
 	help_string "login to the job's node and set the working directory
@@ -684,31 +851,48 @@ c_top_node() {
 	ssh -t $NODE "top"
 }
 
-c_delete_list() {
-	help_string "delete the jobs
-	(NOT YET IMPLEMENTED)"
-	#deleteJob
-	echo $FUNCNAME called with args $@
+#c_delete_list() {
+#	help_string "delete the jobs"
+#	#deleteJob
+#	echo $FUNCNAME called with args $@
+#
+#	#read -p "Sure you want to delete job $ID?  " RES
+#	#if [ "$RES" == "y" ]; then
+#	#	qdel $ID
+#	#fi
+#	#TODO
+#}
 
-	#read -p "Sure you want to delete job $ID?  " RES
-	#if [ "$RES" == "y" ]; then
-	#	qdel $ID
-	#fi
-}
-
-c_load_list() {
-	help_string "check load and memory usage
-	(NOT YET IMPLEMENTED)"
-	#check the load and memory usage for this list of jobs
-	# (to see if one might be swapping)
-	echo $FUNCNAME called with args $@
-}
+#c_load_list() {
+#	help_string "check load and memory usage"
+#	#check the load and memory usage for this list of jobs
+#	# (to see if one might be swapping)
+#	echo $FUNCNAME called with args $@
+#}
 
 #########################################################################
 #-- Start of script --#
 #######################
 
+MASTERHOSTNAME="ccserv1"
 ADDSSHKEY=y
+WALLTIME_WARNING_ABS=5  #hours
+WALLTIME_WARNING_REL=10 #%
+
+# should contain all variables that the main block
+# of the config file can overwrite
+# read by parse_config
+ALLGLOBALSETTINGS="MASTERHOSTNAME ADDSSHKEY WALLTIMEWARNING"
+declare -r ALLGLOBALSETTINGS
+
+# associative bash array for the aliases
+# indexed value is the aliased shortcut and 
+# the value is the long form the alias expands to
+declare -A ALIASES
+
+parse_config
+preliminary_checks
+
 while [ "$1" ]; do
 	case "$1" in
 		-h|--help)
