@@ -760,7 +760,6 @@ c_quit_none() {
 
 c_help_none() {
 	help_string "print this help"
-	#TODO improve and expand
 
 	echo "The following commands are implemented:"
 	for category in none id node list; do
@@ -768,11 +767,11 @@ c_help_none() {
 	done
 
 	cat <<- EOF
-
-	<id> is a job id or jobname (or a pattern for it)
-	<list> is a list of job ids or same as <id>
-	if pattern is not unique, the command only works for <list>
-
+	In the above list
+	   <id> is a job id or jobname (or a pattern to match these fields)
+	   <list> is a list of job ids or a list of jobnames or a pattern
+	If a pattern gives rise to more than one matching entry, than
+	it is only valid for a command expecting a <list>
 	
 	Bugs / Suggestions / Feature Requests:
 	      $DEVELOPER
@@ -799,16 +798,14 @@ c_summary_none() {
 	- recently submitted jobs 
 	- summary of load on the cluster 
 	- your fairshare stats"
-	#TODO ideas: No of active nodes/processors, how many occupied by me
-	# which node is the one that has free processors
 
 	# cache:
 	QUSER="$(qstat -u $USER)"
 	if [[ $(echo -n "$QUSER" | grep -c "$USER") -lt $SUMMARY_MAXJOBS ]]; then
-		echo "All jobs running:"
+		echo -e "\033[0;33mAll\033[0;00m your current jobs:"
 		echo "$QUSER"
 	else
-		echo "$SUMMARY_MAXJOBS most recently submitted jobs (run \"joblist\" for all):"
+		echo -e "$SUMMARY_MAXJOBS \033[0;33mmost recently submitted\033[0;00m jobs (run \"joblist\" for all):"
 		echo "$QUSER" | awk 'BEGIN {pr=1}; pr==1 ; /^--------/ {pr==0; exit}'
 		echo "$QUSER" | grep "$USER" | sort -r | head -n $SUMMARY_MAXJOBS
 		#TODO if queuing list estimated time of start using showstart
