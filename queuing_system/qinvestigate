@@ -938,6 +938,13 @@ c_login_node() {
 	ssh -t "$NODE" "cd /lscratch/$ID; bash -il"
 }
 
+c_scratch_node() {
+	help_string "login to the nodes scratch folder /scratch/$USER"
+	local NODE="$1"
+	local ID="$2"
+	ssh -t "$NODE" "cd /scratch/; cd $USER; bash -il"
+}
+
 c_top_node() {
 	help_string "login to the job's node and call top"
 	local NODE="$1"
