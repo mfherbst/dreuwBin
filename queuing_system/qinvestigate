@@ -871,18 +871,23 @@ c_summary_none() {
 				}	
 			}
 
-			printf "%-" maxlen "s  %8s   %18s   %s\n", "Node", "availCPU", "%TOT (avail mem) MB", "properties"
-			printf "%-" maxlen "s  %8s   %18s   %s\n", "----", "--------", "-------------------", "----------"
+			printf "%-" maxlen "s  %8s   %19s   %s\n", "Node", "availCPU", "%TOT (avail mem) MiB", "properties"
+			printf "%-" maxlen "s  %8s   %19s   %s\n", "----", "--------", "--------------------", "----------"
 			for (i=1; i<=nodecount; ++i) {
+				if (nodeavailcpus[nodes[i]] == "") {
+					#if no jobs on node we set nodeavailcpus to total number of cpus
+					nodeavailcpus[nodes[i]]=nodetotcpus[nodes[i]]
+				}
+
 				colbef=""
 				colaft=""
 				if (nodeavailcpus[nodes[i]] > 0) {
 					colbef="\033[0;32m"
 					colaft="\033[0;00m"	
 				}
-				printf "%-" maxlen "s  " colbef "%8s" colaft "  %6.2f%% %10iMB   %s\n", \
+				printf "%-" maxlen "s  " colbef "%8s" colaft "  %6.2f%% %13i   %s\n", \
 					nodes[i], nodeavailcpus[nodes[i]] "/" nodetotcpus[nodes[i]], \
-					(nodeavailmem[nodes[i]]/nodetotmem[nodes[i]]), nodeavailmem[nodes[i]]/1024, nodeprops[nodes[i]]
+					(nodeavailmem[nodes[i]]/nodetotmem[nodes[i]]*100), nodeavailmem[nodes[i]]/1024, nodeprops[nodes[i]]
 			}
 		}
 		'
