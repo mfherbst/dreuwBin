@@ -17,11 +17,11 @@
 # file COPYING or at <http://www.gnu.org/licenses/>.
 
 # load library:
-. $(dirname $0)/../shared.config.lib.sh
+. $(dirname $0)/../shared.config.lib.sh || exit 1
 
 ##########################################################################
 #Settings
-DEVELOPER="info@michael-herbst.com" #main developer of this script
+DEVELOPER="Michael F. Herbst <info@michael-herbst.com>" #main developer of this script
 WARNINGWAIT=2 #number of seconds to wait if a warning is issued
 
 #set this to allow @( ) and ?( ) patterns in case ... and other pathname expansions
@@ -55,12 +55,6 @@ preliminary_checks() {
 	if [[ "$HOSTNAME" != "$MASTERHOSTNAME" ]]; then
 		echo "Sorry wrong host, please use host $MASTERHOSTNAME to run this."
 		exit 1
-	fi
-	
-	# check if job in queue
-	if ! qstat -u $USER | grep -q $USER; then
-		echo "You currently have no job in the queue"
-		exit 0
 	fi
 }
 
@@ -783,6 +777,7 @@ c_help_none() {
 	done
 
 	cat <<- EOF
+
 	In the above list
 	   <id> is a job id or jobname (or a pattern to match these fields)
 	   <list> is a list of job ids or a list of jobnames or a pattern
@@ -803,7 +798,7 @@ c_alias_none() {
 }
 
 c_joblist_none() {
-	help_string "print all jobs owned by $USER"
+	help_string "print all jobs owned by you."
 	qstat -nu $USER
 	#TODO if queuing list estimated time of start using showstart
 }
@@ -817,7 +812,10 @@ c_summary_none() {
 
 	# cache:
 	QUSER="$(qstat -u $USER)"
-	if [[ $(echo -n "$QUSER" | grep -c "$USER") -lt $SUMMARY_MAXJOBS ]]; then
+	local NUM="$(echo -n "$QUSER" | grep -c "$USER")"
+	if [[ $NUM == 0 ]]; then
+		echo -e "You currently have \033[0;33mno jobs\033[0;00m."
+	elif [[ $NUM -lt $SUMMARY_MAXJOBS ]]; then
 		echo -e "\033[0;33mAll\033[0;00m your current jobs:"
 		echo "$QUSER"
 	else
