@@ -461,6 +461,11 @@ node_for_jobid() {
 	[ -z "$1" ] && return 1
 	qstat  -1 -n "$1" | awk -v "user=$USER" -v "id=$1" '
 		$2 == user {
+			if ($10 != "R") {
+				print("Cannot determine node for jobid " id ": Job is not yet running") > "/dev/stderr"	
+				exit 1
+			}
+
 			#get rid of /procnumber:
 	       		gsub(/\/[0-9]+/,"",$12);
 
