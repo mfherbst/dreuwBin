@@ -176,7 +176,7 @@ default_config() {
 
 		# Should the script check for a running ssh agent
 		# and if the users ssh key is added
-		# default is yes
+		# valid values: "y" or "n"
 		ADDSSHKEY="$ADDSSHKEY"
 
 		# Absolute number of hours of remaining walltime below which
@@ -187,6 +187,10 @@ default_config() {
 		# job is considered to be running out of walltime very soon.
 		WALLTIME_WARNING_REL=$WALLTIME_WARNING_REL
 
+		# Should the delete command confirm its action 
+		# before sending the qdel to the master
+		# valid values: "y" or "n"
+		DELETE_CONFIRMATION=$DELETE_CONFIRMATION
 	}
 
 	aliases {
@@ -488,6 +492,7 @@ node_for_jobid() {
 
 parse_job_args() {
 	# parses all job args on $@ and echos a list of all matching job ids
+	# in the form "jobid1 jobid2 jobid3"
 	# If one or more IDs match returns 0, else 1
 
 	local LIST=""
@@ -816,7 +821,7 @@ c_summary_none() {
 	- your fairshare stats"
 
 	# cache:
-	QUSER="$(qstat -u $USER)"
+	local QUSER="$(qstat -u $USER)"
 	local NUM="$(echo -n "$QUSER" | grep -c "$USER")"
 	if [[ $NUM == 0 ]]; then
 		echo -e "You currently have \033[0;33mno jobs\033[0;00m."
@@ -829,7 +834,7 @@ c_summary_none() {
 		echo "$QUSER" | grep "$USER" | sort -r | head -n $SUMMARY_MAXJOBS
 		#TODO if queuing list estimated time of start using showstart
 	fi
-	qstat -u $USER | awk -v "user=$USER" -v "abs=$WALLTIME_WARNING_ABS" -v "rel=$WALLTIME_WARNING_REL" "
+	echo "$QUSER" | awk -v "user=$USER" -v "abs=$WALLTIME_WARNING_ABS" -v "rel=$WALLTIME_WARNING_REL" "
 		$AWK_TOSEC
 
 		BEGIN {
@@ -986,17 +991,22 @@ c_top_node() {
 	ssh -t $NODE "top"
 }
 
-#c_delete_list() {
-#	help_string "delete the jobs"
-#	#deleteJob
-#	echo $FUNCNAME called with args $@
-#
-#	#read -p "Sure you want to delete job $ID?  " RES
-#	#if [ "$RES" == "y" ]; then
-#	#	qdel $ID
-#	#fi
-#	#TODO
-#}
+c_delete_list() {
+	help_string "Delete one or more jobs"
+	
+	local LIST="$1"
+	local RES
+	for ID in $LIST; do
+		if [ "$DELETE_CONFIRMATION" == "n" ]; then
+			RES="y"
+		else
+			read -p "Really delete job $ID (y/N)?  " RES
+		fi
+		if [ "$RES" == "y" ]; then
+			qdel $ID
+		fi	
+	done
+}
 
 #c_load_list() {
 #	help_string "check load and memory usage"
@@ -1016,11 +1026,12 @@ ADDSSHKEY=y
 WALLTIME_WARNING_ABS=5  #hours
 WALLTIME_WARNING_REL=10 #%
 SUMMARY_MAXJOBS=10 #list max 10 jobs in summary
+DELETE_CONFIRMATION=y
 
 # should contain all variables that the main block
 # of the config file can overwrite
 # read by parse_config
-ALLGLOBALSETTINGS="MASTERHOSTNAME ADDSSHKEY WALLTIME_WARNING_ABS WALLTIME_WARNING_REL SUMMARY_MAXJOBS"
+ALLGLOBALSETTINGS="MASTERHOSTNAME ADDSSHKEY WALLTIME_WARNING_ABS WALLTIME_WARNING_REL SUMMARY_MAXJOBS DELETE_CONFIRMATION"
 declare -r ALLGLOBALSETTINGS
 
 # associative bash array for the aliases
