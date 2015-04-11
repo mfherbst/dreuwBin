@@ -924,13 +924,28 @@ c_summary_none() {
 			n = asort(arr,sorted)
 			i=1
 			for(;i <=n;++i) { if(sorted[i] == arr[user]) break; }
-			gsub("^" user,user " (" n-i+1 "th)",userline)
 
-			#TODO make this better:
-			print "FSInterval                %     Target       0       1       2"
-			#print "FSWeight               ------- -------  1.0000  0.5000  0.2500"
+			place=n-i+1
+			string="th"
+			if (place%10 == 1) string="st"
+			if (place%10 == 2) string="nd"
 
-			print userline 
+			#split userline into fields
+			n = split(userline,ulfields);
+
+			#print heading:
+			printf "%-26s%8s%8s","FSInterval","%","Target"
+			for (i=4;i<=n; ++i) {
+				printf "%8s", (i-4)	
+			}	
+			printf "\n"
+		
+			#print content:	
+			printf "%-20s%-6s", ulfields[1], "(" place string	")"
+			for (i=2; i<=n; ++i) {
+				printf "%8s", ulfields[i]
+			}
+			printf "\n"
 		}
 	'
 }
