@@ -508,6 +508,57 @@ parse_job_args() {
 	return 0
 }
 
+amend_qstat() {
+	# amend qstat output by adding an estimated start/endtime
+	# in an extra column and by removing the user column
+
+	#TODO remove username column
+
+	awk '
+		function getstart(job) {
+			#note this function implicitly sets $0, $1, $2 to ""
+	       		cmd="showstart " job
+			while ( (cmd | getline) ) {
+			       	if (match($0,"start")) {
+					sub("^.* on ","")
+					close(cmd)
+					return $0
+				}
+			}
+			close(cmd)
+			return "-- unknown job --"
+		}
+
+		function getend(job) {
+			#note this function implicitly sets $0, $1, $2 to ""
+	       		cmd="showstart " job
+			while ( (cmd | getline) ) {
+			       	if (match($0,"completion")) {
+					sub("^.* on ","")
+					close(cmd)
+					return $0
+				}
+			}
+			close(cmd)
+			return "-- unknown job --"
+		}
+
+		#the column header, first line
+		$1 ~ "^Req" && $2 ~ "^Req" && $3 == "Elap" { printf "%s  %s\n", $0, "        Estimated"; next }
+		#the column header, second line
+		/^Job ID/ { printf "%s  %s\n", $0, "   Start / Completion"; next }
+
+		#the -- to mark the column
+		/^-----------/ { printf "%s  %s\n", $0, "-------------------"; next}
+		
+		#running or queuing job
+		/^[0-9]/ && $10 == "Q" {printf "%s  %s\n",$0,getstart($1); next}
+		/^[0-9]/ && $10 == "R" {printf "%s  %s\n",$0,getend($1); next}
+		
+		#all other lines:
+		{ print }'
+}
+
 #########################################################################
 #-- shell --#
 #############
@@ -809,8 +860,7 @@ c_alias_none() {
 
 c_joblist_none() {
 	help_string "print all jobs owned by you."
-	qstat -nu $USER
-	#TODO if queuing list estimated time of start using showstart
+	qstat -nu $USER | amend_qstat
 }
 
 c_summary_none() {
@@ -821,7 +871,7 @@ c_summary_none() {
 	- your fairshare stats"
 
 	# cache:
-	local QUSER="$(qstat -u $USER)"
+	local QUSER="$(qstat -u $USER | amend_qstat)"
 	local NUM="$(echo -n "$QUSER" | grep -c "$USER")"
 	if [[ $NUM == 0 ]]; then
 		echo -e "You currently have \033[0;33mno jobs\033[0;00m."
@@ -832,7 +882,6 @@ c_summary_none() {
 		echo -e "$SUMMARY_MAXJOBS \033[0;33mmost recently submitted\033[0;00m jobs (run \"joblist\" for all):"
 		echo "$QUSER" | awk 'BEGIN {pr=1}; pr==1 ; /^--------/ {pr==0; exit}'
 		echo "$QUSER" | grep "$USER" | sort -r | head -n $SUMMARY_MAXJOBS
-		#TODO if queuing list estimated time of start using showstart
 	fi
 	echo "$QUSER" | awk -v "user=$USER" -v "abs=$WALLTIME_WARNING_ABS" -v "rel=$WALLTIME_WARNING_REL" "
 		$AWK_TOSEC
@@ -957,6 +1006,7 @@ c_summary_none() {
 
 #c_stats_id() {
 #	help_string "display some job statistics"
+#       ???
 #
 #	echo $FUNCNAME called with args $@
 #	#TODO
