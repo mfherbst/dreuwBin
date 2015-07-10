@@ -18,23 +18,12 @@
 
 # load library:
 . $(dirname $0)/../shared.config.lib.sh || exit 1
+. $(dirname $0)/../shared.tabcomplete.lib.sh || exit 1
 
 ##########################################################################
 #Settings
 DEVELOPER="Michael F. Herbst <info@michael-herbst.com>" #main developer of this script
 WARNINGWAIT=2 #number of seconds to wait if a warning is issued
-
-#set this to allow @( ) and ?( ) patterns in case ... and other pathname expansions
-shopt -qs extglob
-
-#switch to vi or emacs line editing mode
-#(needed to allow the binding of \t to "tabcomplete" and hence tab completion)
-if set -o | awk '$1 == "emacs" { if ($2 =="off") exit 0; exit 1}'; then
-	#no emacs editing mode, hence
-	set -o vi
-else
-	set +o vi
-fi
 
 #########################################################################
 #-- checks and setup --#
@@ -563,80 +552,6 @@ amend_qstat() {
 #-- shell --#
 #############
 
-# GLOBAL variable containing the last execution time of tabcomplete
-# where only a partial completion of the command was achieved
-TAB_PARTIAL_LASTEXEC=0
-tabcomplete() {
-	# try to complete the READLINE_LINE
-	
-	# discard tab if no input on line
-	[ -z "$READLINE_LINE" ] && return
-
-	# remove leading whitespace:
-	local NORMALISED="${READLINE_LINE##*( )}" #requires extglob again
-
-	# if NORMALISED contains a space, we are already completing the args
-	# => quit
-	[[ $NORMALISED == *" "*  ]] && return
-	#TODO completion for arguments
-
-	# try to match command. If no match -> return
-	local MATCHES
-	MATCHES=$(list_commands_aliases | tr ' ' '\n' | grep "^$NORMALISED") || return
-
-	# find longest substring in matches:
-	local LONGCOMMON
-	# In the awk script we go through all matches and determine
-	# the longest common sequence of characters at the start of
-	# all matches
-	LONGCOMMON=`echo "$MATCHES" | awk '
-		function commonstart(a,b) {
-			# function to determine the longest sequence of characters
-			# that starts both strings
-
-			#determine minimum length of both strings
-			len=length(a)
-			if (length(b) < len) {
-				len=length(b)
-			}
-
-			#determine longest common start:
-			for(i = 1; i <= len; ++i) {
-				if ( substr(a,i,1) != substr(b,i,1) ) {
-					return substr(a,0,i-1)
-				}
-			}
-			return substr(a,0,len)
-		}
-	
-		BEGIN {comm="" };
-		NR == 1 { comm=$0; next };
-		NR > 1 { comm=commonstart(comm,$0); };
-		END { print comm }
-		'
-	`
-	
-	if [[ $(echo -n "$MATCHES" | grep -c '^') == 1 ]]; then
-		#single match: Tab complete
-		READLINE_LINE="$MATCHES "
-		READLINE_POINT=$(( ${#MATCHES} + 1))
-		return
-	fi
-
-	# fill up to common chars:
-	READLINE_LINE="$LONGCOMMON"
-	READLINE_POINT=${#MATCHES}
-
-	# pressed tab twice within 3 seconds
-	if (( $(date +%s) - TAB_PARTIAL_LASTEXEC < 4  )); then
-		#print list of matching commands
-		echo -n "$MATCHES" | tr '\n' '   '
-		echo
-	fi
-	TAB_PARTIAL_LASTEXEC=$(date +%s)
-	return
-}
-
 shell_loop() {
 	local RET=0
 
@@ -668,8 +583,10 @@ shell_loop() {
 			echo -e "rc: \033[0;32m$RET\033[0;00m"
 		fi
 
-		#tab completion with function tabcomplete:
-		bind -x '"\t":"tabcomplete"';
+		# tab completion with function tabcomplete_first_word from tabcomplete lib
+		TAB_FIRST_WORDS=( $(list_commands_aliases) )
+		bind -x '"\t":"tabcomplete_first_word"';
+		#TODO implement completion for arguments
 
 		read -e -p "($(printf "%6s" "$LASTJOBID")) >" LINE
 		
