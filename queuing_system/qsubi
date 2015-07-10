@@ -37,6 +37,12 @@ Options:
 --np <np>       number of processors (Default: $PROC)
 --wt <hours>    hours of walltime    (Default: $WALLTIME)
 --mem <gb>      gb of memory         (Default: $MEMORY)
+
+--no-screen-check
+Do not check wheather qsubi is executed in a screen session.
+
+NOTE: At the moment the --mem option sets both mem and vmem to
+      the same value provided.
 EOF
 }
 
