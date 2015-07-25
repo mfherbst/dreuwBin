@@ -97,6 +97,10 @@ ConfigParseStdin() {
 		}	
 
 		\$0 ~ matchstring {
+			# remove space around the =
+			sub(/[[:space:]]*$/,\"\",\$1)
+			sub(/^[[:space:]]*/,\"\",\$2)
+
 			# remove tailling or leading \"
 			sub(/^\"/,\"\",\$2)
 			sub(/\"$/,\"\",\$2)
@@ -116,6 +120,22 @@ ConfigParseStdin() {
 		}
 	"
 }
+
+ConfigParse() {
+        # Uses ConfigParseStdin to parse the config file
+        # obtained via ConfigGet
+        # $@: Allowed options
+        # returns 1 if no config file was found
+        # returns 8 if the config contained invalid options
+        # prints a message to stderr in the latter case as well
+
+        [ ! -f "$CONFFILE" ] && return 1
+        local PARSED
+        if ! PARSED=$(ConfigGet | ConfigParseStdin "$@"); then
+                return 8
+        fi
+        eval "$PARSED"
+} 
 
 ConfigParseBlock() {
 	# Uses ConfigParseStdin to parse the Block obtained via
