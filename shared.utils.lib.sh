@@ -65,3 +65,8 @@ is_email_valid() {
 	#$1: An email address to check
 	echo -n "$1" | grep -q -E "^[A-Za-z0-9._%+\-\!#$&'*/=?^\`{|}~]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$"
 }
+
+remove_extension() {
+	#$1 a path
+	echo ${1%.*}
+}
