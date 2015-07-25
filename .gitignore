@@ -1,3 +1,5 @@
 #Ignore the following:
 *~
 .*.swp
+*.pyc
+__pycache__/
