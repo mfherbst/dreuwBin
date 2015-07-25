@@ -1,10 +1,26 @@
 # vi: set et ts=4 sw=4 sts=4:
 
+# Python module to merge objects of a given type into each other
+# Copyright (C) 2015 Michael F. Herbst
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# A copy of the GNU General Public License can be found in the 
+# file COPYING or at <http://www.gnu.org/licenses/>.
+
 class MergeException(Exception):
     """
     Exception thrown when merging two objects does
     not work (i.e. because both patches have respective
-    values set.)
+    values set, and updates are not allowed)
     """
     def __init__(self,message):
         super(MergeException, self).__init__(message)
@@ -21,12 +37,32 @@ class objectmerge:
         if variable is already set, a MergeException will be thrown
     """
 
-    def __init__(self,receiver):
+    def __init__(self,receiver,allowUpdates=False, allowListExtend=True):
+        """
+        initialise an objectmerge. 
+
+        If allowListExtend is False than extendable members in both objects are not 
+        merged much rather they are treated the same way as normal variables. (A merge
+        will only be successful if they are identical or one of them is None)
+        
+        If allowUpdates is true than variables that differ are set to the sender 
+        values in the  merge_in function
+        """
         self.__receiver = receiver
+        self.__allowUpdates = allowUpdates
+        self.__allowListExtend = allowListExtend
 
     @property
     def receiver(self):
         return self.__receiver
+
+    @property
+    def allowUpdates(self):
+        return self.__allowUpdates
+
+    @property
+    def allowListExtend(self):
+        return self.__allowListExtend
 
     def merge_in(self,sender):
         """
@@ -36,7 +72,7 @@ class objectmerge:
 
         Reasons for this are for example:
         The two objects contain deviating data on the same fields
-        (which are not lists).
+        (which are not e.g. lists).
         """
 
         res = self.__assert_mergeable(sender)
@@ -50,15 +86,16 @@ class objectmerge:
             if sender_vars[var] is None:
                 continue
 
-            if rec_vars[var] is None:
-                rec_vars[var] = sender_vars[var]
-                continue
+            if allowListExtend is True:
+                # see if rec_vars[var] has the extend method:
+                extend_op = getattr(rec_vars[var], "extend", None)
+                if callable(extend_op):
+                    extend_op(sender_vars[var])
+                    continue
 
-            # see if rec_vars[var] has the extend method:
-            extend_op = getattr(rec_vars[var], "extend", None)
-            if callable(extend_op):
-                extend_op(sender_vars[var])
-                continue
+            # just set the value:
+            rec_vars[var] = sender_vars[var]
+
 
     def __assert_mergeable(self,sender):
         """
@@ -67,6 +104,10 @@ class objectmerge:
         """
         if not issubclass(type(sender), type(self.receiver)):
             return "Types of receiver and sender do not match"
+
+        # if updates are allowed frome here on we are ok
+        if self.allowUpdates:
+            return None
 
         sender_vars = vars(sender)
         rec_vars = vars(self.receiver)
@@ -78,10 +119,11 @@ class objectmerge:
             if rec_vars[var] == sender_vars[var]:
                 continue
 
-            # see if rec_vars[var] has the extend method:
-            extend_op = getattr(rec_vars[var], "extend", None)
-            if callable(extend_op):
-                continue
+            if allowListExtend is True:
+                # see if rec_vars[var] has the extend method:
+                extend_op = getattr(rec_vars[var], "extend", None)
+                if callable(extend_op):
+                    continue
 
             # one criteria did not work
             return ("Could not merge variable " + str(var))
