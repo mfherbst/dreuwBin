@@ -1,0 +1,246 @@
+#!/bin/bash
+
+# Script to run a speciffic qchem version
+# Copyright (C) 2015 Michael F. Herbst
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# A copy of the GNU General Public License can be found in the 
+# file COPYING or at <http://www.gnu.org/licenses/>.
+
+# load library:
+. $(dirname $0)/../shared.config.lib.sh || exit 1
+. $(dirname $0)/../shared.utils.lib.sh || exit 1
+. $(dirname $0)/../shared.tabcomplete.lib.sh || exit 1
+
+#########################################################################
+#-- checks and setup --#
+########################
+
+preliminary_checks () {
+	if [ ! -d "$VERSION_DIR" ]; then
+		echo "Version directory $VERSION_DIR does not exist." >&2
+		echo "Please configure qchem-vselector differently or " >&2
+		echo "create an emtpy directory there." >&2
+		exit 1
+	fi
+}
+
+script_usage() {
+	# help to print if script is called with -h or --help
+
+	cat <<- EOF
+	$(basename $0) <Options> [ --exec <qchem options> ]
+
+	Script to select a particular qchem version in order to run a calculation 
+	with it. Per default the user is asked what qchem version he or she wants 
+	to run out of the scripts located in in a pre-configured directory
+	(per default $VERSION_DIR).
+
+	If the user wants to force quiet usage of a particular version the environment
+	variable QCHEM_FORCE_VERSION should be set to this speciffic value.
+
+	Options:
+	   --version     Force usage of a particular version (takes preference over
+	                 QCHEM_FORCE_VERSION)
+	   --list        List available versions.
+	   --exec        Not only print the final path to stdout, but also execute
+	                 it with all options provided afterwards on the commandline
+EOF
+
+
+}
+
+#########################################################################
+#-- config management --#
+#########################
+
+ask_for_default_parameters() {
+	while true; do
+		read -e  -p "Enter directory where all your qchem scripts are located: " -i "$VERSION_DIR" VERSION_DIR >&2
+		
+		if [ ! -d "$VERSION_DIR" ]; then
+			echo "--> Directory not found" >&2
+			continue
+		fi
+
+		if [ "$(find  "$VERSION_DIR" -maxdepth 1 -type f -executable | wc -l)" -lt 1 ]; then
+			echo "--> Did not find any executalbe file in $VERSION_DIR" >&2
+			continue
+		fi
+
+		break
+	done
+}
+
+default_config() {
+	# spits out the default configuration
+
+	cat <<- EOF
+	# The systax of all options is 
+	# <OPTIONNAME> = "<OPTIONVALUE>"
+	# Both spaces around the = as well as the " around the
+	# <OPTIONVALUE> are optional. 
+	# 
+	# <OPTIONVALUE> may not continue any of the three characters
+	#  " = '
+
+	main {
+		# The directory which contains the various qchem scripts
+		VERSION_DIR=$VERSION_DIR
+
+		# The file where the most recent selection is stored:
+		HISTORY_FILE=$HISTORY_FILE
+	}
+	EOF
+}
+
+parse_config() {
+	#Parse mainblock	
+	ConfigParseBlock "main" $ALLGLOBALSETTINGS
+	case "$?" in
+		2)
+			echo "main block missing in config file `ConfigPath`" >&2
+			echo "Please add at least an empty block \"main {}\"" >&2
+			exit 1
+			;;
+		8)
+			echo "The main block of `ConfigPath` contained invalid config options." >&2
+			exit 1
+			;;
+		0)
+			#All fine
+			:
+			;;
+		*)	#No Config yet present
+			echo "No config file present. I will generate one for you" >&2
+			ask_for_default_parameters
+			#Dump default:
+			default_config | ConfigPut
+			echo "NOTICE: Default config dumped in file `ConfigPath`" >&2
+			parse_config
+		       	return $?
+			;;
+	esac
+}
+
+#########################################################################
+#-- Actions --#
+###############
+
+cat_versions() {
+	find "$VERSION_DIR" -maxdepth 1 -executable -type f | sed "s#^${VERSION_DIR}/\?##g"
+}
+
+list_versions() {
+	echo "The following versions are available:"
+	cat_versions | sed "s/^/     /g"
+}
+
+ask_user_for_version() {
+	# ask the user for the version to execute and fill VERSION variabl
+	
+	list_versions >&2
+
+	# tab completion with function tabcomplete_first_word from tabcomplete lib
+	TAB_FIRST_WORDS=( $(cat_versions) )
+	bind -x '"\t":"tabcomplete_first_word"';
+
+	echo >&2
+	read -e -i "$(emerge_recent_version)" -p "Enter version to use: " VERSION >&2
+
+	# disable tab completion:
+	bind -r '\t'
+
+	echo >&2
+	echo "Note, that you can skip this question next time by setting" >&2
+       	echo "QCHEM_FORCE_VERSION to the value you just chose." >&2
+}
+
+store_recent_version() {
+	# $1: Version to store
+
+	echo "$1" > "$HISTORY_FILE"
+}
+
+emerge_recent_version() {
+	[ ! -r "$HISTORY_FILE" ] && return
+	tail -n 1 "$HISTORY_FILE"
+}
+
+version_is_valid() {
+	#$1 version to test
+
+	[ -x "$VERSION_DIR/$1" ]
+}
+
+#########################################################################
+#-- Start of script --#
+#######################
+
+VERSION_DIR="$HOME/bin/versions/q-chem" #dir where versions can be found
+HISTORY_FILE="$(remove_extension "$(ConfigPath)").history"
+
+ALLGLOBALSETTINGS="VERSION_DIR HISTORY_FILE"
+declare -r ALLGLOBALSETTINGS
+
+VERSION=${QCHEM_FORCE_VERSION} # The selected q-chem version
+EXECUTE="n" # Execute the program in the end
+
+# parse the config and do preliminary checks
+parse_config
+preliminary_checks
+
+while [ "$1" ]; do
+	case "$1" in
+		-h|--help)
+			script_usage 
+			exit 0
+			;;
+		--version)
+			shift
+			VERSION="$1"
+			;;
+		--list)
+			list_versions
+			exit 0
+			;;
+		--exec)
+			EXECUTE="y"
+			break
+			;;
+		*)
+			echo "Unrecognised commandline argument: $1" >&2
+			echo "Run $(basename $0) -h for help." >&2
+			exit 1
+			break
+			;;
+	esac
+	shift
+done
+
+if [ -z "$VERSION" ];then
+	ask_user_for_version
+fi
+
+if ! version_is_valid "$VERSION"; then
+	echo "Invalid version." >&2
+	exit 1
+fi
+
+store_recent_version "$VERSION"
+
+if [ "$EXECUTE" == "y" ]; then
+	eval "$VERSION_DIR/$VERSION $@"
+	exit $?
+fi
+echo "$VERSION_DIR/$VERSION"
+exit 0

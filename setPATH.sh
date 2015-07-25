@@ -4,7 +4,7 @@
 #DIR where this file is saved:
 _dreuwBin_DIR=`dirname ${BASH_SOURCE[0]}`
 
-for extra in . queuing_system; do
+for extra in . queuing_system qchem; do
 	export PATH="$PATH:$_dreuwBin_DIR/$extra"
 done
 
