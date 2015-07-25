@@ -105,7 +105,7 @@ class copy_in_hook(hook_base):
         if not isinstance(calc_env,calculation_environment):
             raise TypeError("calc_env not of type calculation_environment")
 
-        return copy_from_to_hook(params.submit_workdir,calc_env.server_work_dir,self.__files)\
+        return copy_from_to_hook(params.submit_workdir,calc_env.node_work_dir,self.__files)\
                 .generate(data,params,calc_env)
 
 class copy_out_hook(hook_base):
@@ -137,7 +137,7 @@ class copy_out_hook(hook_base):
         if not isinstance(calc_env,calculation_environment):
             raise TypeError("calc_env not of type calculation_environment")
 
-        return copy_from_to_hook(calc_env.server_work_dir,params.submit_workdir,self.__files)\
+        return copy_from_to_hook(calc_env.node_work_dir,params.submit_workdir,self.__files)\
                 .generate(data,params,calc_env)
 
 #######################################################################
@@ -161,13 +161,10 @@ class DataNotReady(Exception):
 
 class calculation_environment:
     def __init__(self):
-        self.server_work_dir=None #str; shell variable containing the dir where calculations take place on the server
-        self.server_scratch_dir=None #str; shell variable containing the dir where node-local scratch files may be placed
+        self.node_work_dir=None #str; shell variable containing the dir where calculations take place on the server
+        self.node_scratch_dir=None #str; shell variable containing the dir where node-local scratch files may be placed
         self.return_value=None #str; shell variable containing the return value
         
-        #TODO server_scratch_dir and server_work_dir are misnomers, change to node_* instead
-        #TODO change name of the q-chem directory to qchem
-
 #######################################################################
 #--  Main class  --#
 ####################
@@ -200,12 +197,12 @@ class jobscript_builder:
         self.__payload_hooks = queue.PriorityQueue() # hooks that generate payload code
         self.__error_hooks = queue.PriorityQueue() # hooks that generate code executed when the job crashes
         self.__qsys_data = qd.queuing_system_data()
-        self.__server_workdir_base = None # get from e.g. Config: The base directory to use for the calculations.
+        self.__node_workdir_base = None # get from e.g. Config: The base directory to use for the calculations.
                                     # if not otherwise specified, add jobname to get work_dir
-        self.__server_scratchdir_base = None # get from e.g. Config: Base dir to use for node-local scratch files
-                                    # if not otherwise specified, add jobname to get server_scratch_dir
-        self.__force_server_workdir = None # this workdir has been enforced on the server via a commandline flag
-        self.__force_server_scratchdir = None # this scratchdir has been enforced via a commandline flag
+        self.__node_scratchdir_base = None # get from e.g. Config: Base dir to use for node-local scratch files
+                                    # if not otherwise specified, add jobname to get node_scratch_dir
+        self.__force_node_workdir = None # this workdir has been enforced on the server via a commandline flag
+        self.__force_node_scratchdir = None # this scratchdir has been enforced via a commandline flag
 
     @property
     def qsys(self):
@@ -336,10 +333,10 @@ class jobscript_builder:
 
         # parse it:
         if len(k.get_value("workdir_base")) > 0:
-            self.__server_workdir_base = k.get_value("workdir_base")
+            self.__node_workdir_base = k.get_value("workdir_base")
 
         if len(k.get_value("scratchdir_base")) > 0:
-            self.__server_scratchdir_base = k.get_value("scratchdir_base")
+            self.__node_scratchdir_base = k.get_value("scratchdir_base")
 
         if len(k.get_value("mail")) > 0:
             data.email = k.get_value("mail")
@@ -452,10 +449,10 @@ class jobscript_builder:
             data.priority = args.priority
         
         if args.workdir is not None:
-            self.__force_server_workdir = args.workdir
+            self.__force_node_workdir = args.workdir
         
         if args.scratchdir is not None:
-            self.__force_server_scratchdir = args.scratchdir
+            self.__force_node_scratchdir = args.scratchdir
 
         if args.queue is not None:
             data.queue_name = args.queue
@@ -499,17 +496,17 @@ class jobscript_builder:
         if not qsys.is_ready_for_submission(data):
             raise DataNotReady(qsys.why_not_ready_for_submission(data))
 
-        workdir=self.__force_server_workdir
+        workdir=self.__force_node_workdir
         if workdir is None:
-            if self.__server_workdir_base is None or data.job_name is None:
+            if self.__node_workdir_base is None or data.job_name is None:
                 raise DataNotReady("work_dir not set. Either specify it on the commandline or add a workdir_base in the config file and a job name on the command line.")
-            workdir = self.__server_workdir_base + "/" + data.job_name
+            workdir = self.__node_workdir_base + "/" + data.job_name
 
-        scratchdir = self.__force_server_scratchdir
+        scratchdir = self.__force_node_scratchdir
         if scratchdir is None:
-            if self.__server_scratchdir_base is None or data.job_name is None:
+            if self.__node_scratchdir_base is None or data.job_name is None:
                 raise DataNotReady("scratch_dir not set. Either specify it on the commandline or add a scratchdir_base in the config file and a job name on the command line.")
-            scratchdir = self.__server_scratchdir_base + "/" + data.job_name
+            scratchdir = self.__node_scratchdir_base + "/" + data.job_name
 
 
         if self.queuing_system_data.walltime is None:
@@ -531,8 +528,8 @@ class jobscript_builder:
         string += separator
 
         # Copy global vars from python part
-        environ.server_work_dir = "NODE_WORKDIR"
-        environ.server_scratch_dir="NODE_SCRATCHDIR"
+        environ.node_work_dir = "NODE_WORKDIR"
+        environ.node_scratch_dir="NODE_SCRATCHDIR"
         environ.return_value = "RETURN_VALUE"
         string += 'NODE_WORKDIR="' + workdir + '"\n'
         string += 'RETURN_VALUE=0\n' 

@@ -109,7 +109,7 @@ class v40_qchem_payload(jsb.hook_base):
 
         # Test if QCAUX and QC exist
 
-        string = 'export QCSCRATCH="$' + calc_env.server_scratch_dir + '"\n'
+        string = 'export QCSCRATCH="$' + calc_env.node_scratch_dir + '"\n'
 
         if qchem_args.use_perf:
             string += "if which perf &> /dev/null; then\n"
