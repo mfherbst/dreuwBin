@@ -8,4 +8,8 @@ for extra in . queuing_system; do
 	export PATH="$PATH:$_dreuwBin_DIR/$extra"
 done
 
+for extra in .; do
+	export PYTHONPATH="$PYTHONPATH:$_dreuwBin_DIR/$extra"
+done
+
 unset _dreuwBin_DIR
