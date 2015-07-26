@@ -97,9 +97,9 @@ class v40_qchem_payload(jsb.hook_base):
         if qchem_args.save_flag:
             args += " -save"
         if qchem_args.np_flag:
-            args += " -np " + data.no_procs()
+            args += " -np " + str(data.no_procs())
         if qchem_args.nt_flag:
-            args += " -nt " + data.no_procs()
+            args += " -nt " + str(data.no_procs())
         args += ' "' + qchem_args.infile + '"'
         if qchem_args.outfile is not None:
             args += ' "' + qchem_args.outfile + '"'
@@ -180,12 +180,9 @@ class v40(jsb.jobscript_builder):
         argparse.add_argument("--version", default=None, type=str, help="Version string identifying the Q-Chem version to be used.")
         argparse.add_argument("--perf", default=False, action='store_true',help="Use time or perf to montitor the memory/cpu usage of Q-Chem.")
 
-        epilog="The script tries to complete parameters and information which are not explicitly provided on the commandline using the infile.in input file. This includes \n" \
-                + "   - jobname\n" \
-                + "   - output file name\n" \
-                + "   - walltime (via \"!QSYS wt=\" directive)\n" \
-                + "   - number of processors (using threads directive)\n" \
-                + "   - physical and virtual memory (using memstatic and memtotal)\n"
+        epilog="The script tries to complete parameters and information which are not explicitly provided on the commandline using the infile.in input file. This includes: " \
+                + "jobname (Name of the file), output file name, walltime (via \"!QSYS wt=\" directive), number of processors (using threads directive or \"!QSYS np=\", " \
+                + "physical and virtual memory (using memstatic and memtotal)"
 
         if argparse.epilog is None:
             argparse.epilog = epilog
@@ -224,12 +221,15 @@ class v40(jsb.jobscript_builder):
             for line in f:
                 line = line.strip()
 
-                if line.startswith("!QSYS wt=") and data.walltime is None:
-                    try:
-                        data.walltime = utils.interpret_string_as_time_interval(line[9:].strip())
-                    except ArgumentParser:
-                        data.walltime = None
-                    continue
+                if line.startswith("!QSYS wt="):
+                    if data.walltime is None:
+                        try:
+                            data.walltime = utils.interpret_string_as_time_interval(line[9:].strip())
+                        except ArgumentParser:
+                            pass
+                        continue
+                    else:
+                        print("Warning: Ignoring walltime specified in input file via \"!QSYS wt=\", since walltime already given on commandline.")
 
                 if line.startswith("$end"):
                     section=None

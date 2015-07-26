@@ -611,9 +611,9 @@ stage_out() {
     
     if echo "$NODE_SCRATCHDIR"/* | grep -q "$NODE_SCRATCHDIR/\*$"; then
         # no files in scratchdir:
-        du -shc . | sed 's/^/    /g'
+        du -shc * | sed 's/^/    /g'
     else
-        du -shc . "$NODE_SCRATCHDIR"/* | sed 's/^/    /g'
+        du -shc * "$NODE_SCRATCHDIR"/* | sed 's/^/    /g'
     fi
 
     echo
