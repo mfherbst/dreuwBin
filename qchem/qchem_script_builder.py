@@ -231,6 +231,18 @@ class v40(jsb.jobscript_builder):
                     else:
                         print("Warning: Ignoring walltime specified in input file via \"!QSYS wt=\", since walltime already given on commandline.")
 
+                if line.startswith("!QSYS np="):
+                    if data.no_nodes() == 0:
+                        try:
+                            node = qd.node_type()
+                            node.no_procs = utils.interpret_string_as_time_interval(line[9:].strip())
+                            data.add_node_type(node)
+                        except ArgumentParser:
+                            pass
+                        continue
+                    else:
+                        print("Warning: Ignoring number of processes specified in input file via \"!QSYS np=\", since already specified on commandline.")
+
                 if line.startswith("$end"):
                     section=None
                     continue
