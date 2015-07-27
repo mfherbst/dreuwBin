@@ -1,7 +1,7 @@
 _qinvestigate() {
 	local prev=${COMP_WORDS[$((COMP_CWORD-1))]}
 	local cur=${COMP_WORDS[COMP_CWORD]}
-	local commands='alias help joblist summary login top scratch delete'
+	local commands='alias help joblist summary login top scratch delete diskspace'
 	local options='-h --help --add-sshkey --no-add-sshkey'
 	local aliases='' #TODO implement
 

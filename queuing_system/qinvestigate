@@ -780,6 +780,29 @@ c_joblist_none() {
 	qstat -nu $USER | amend_qstat
 }
 
+c_diskspace_none() {
+	help_string "Print the space you occupy in /scratch and /lscratch on each node"
+
+	for node in $(
+	qnodes | awk '
+       		BEGIN {curnode="";}
+	       	
+		curnode != "" && /^[[:space:]]*$/ {curnode="";next}
+		/^[[:graph:]]+$/ { curnode=$0; next }
+		
+		curnode != "" && $1 == "state" && $3 != "offline" { print curnode; curnode=""; next }
+	'); do
+		ssh $node "
+			DIRS=
+			[ -d /scratch/$USER ] && DIRS=\"\$DIRS /scratch/$USER\"
+			[ -d /lscratch/$USER ] && DIRS=\"\$DIRS /lscratch/$USER\"
+			[ -z \"\$DIRS\" ] && exit
+			echo -n \"\$HOSTNAME  \"
+			du -sh \$DIRS | sed 's/^/   /g; s/\t/  /g' | tr '\\n' ' '
+			echo"
+	done
+}
+
 c_summary_none() {
 	help_string "print a short summary including 
 	- jobs running out of walltime 
