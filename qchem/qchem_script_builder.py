@@ -319,12 +319,6 @@ class v40(jsb.jobscript_builder):
         if  args.savedir is not None and args.savedir.count("/") > 0:
             raise SystemExit("The savedir given should not be a path, just a name")
 
-        if args.version is not None:
-            try:
-                self.__qchem_args.qchem_executable = determine_qchem_path(version_string=args.version)
-            except QChemPathNotDeterminedError as e:
-                raise SystemExit("Invalid Q-Chem version string passed via --version")
-
         # set internal values:
         self.__qchem_args = v40_qchem_args()
         self.__qchem_args.infile=args.infile
@@ -333,6 +327,12 @@ class v40(jsb.jobscript_builder):
         self.__qchem_args.np_flag=args.np_to_qchem
         self.__qchem_args.nt_flag=args.nt_to_qchem
         self.__qchem_args.use_perf = args.perf
+
+        if args.version is not None:
+            try:
+                self.__qchem_args.qchem_executable = determine_qchem_path(version_string=args.version)
+            except QChemPathNotDeterminedError as e:
+                raise SystemExit("Invalid Q-Chem version string passed via --version")
 
         # split .in extension from filename
         filename, extension =  os.path.splitext(self.__qchem_args.infile)
