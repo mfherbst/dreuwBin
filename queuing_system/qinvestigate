@@ -848,7 +848,7 @@ c_summary_none() {
 		curnode != "" && /^[[:space:]]*$/ {curnode="";next}
 		/^[[:graph:]]+$/ { curnode=$0; next }
 		
-		curnode != "" && $1 == "state" && $3 == "offline" { curnode=""; next }
+		curnode != "" && $1 == "state" && ( $3 == "offline" || $3 == "down" ) { curnode=""; next }
 	       	curnode != "" && $1 == "np" { nodetotcpus[curnode]=$3; nodes[++nodecount]=curnode }
 		curnode != "" && $1 == "properties" { nodeprops[curnode]= $3}
 		curnode != "" && $1 == "jobs" { nodeavailcpus[curnode]= (nodetotcpus[curnode]-split($3,a,",")) }
@@ -898,9 +898,14 @@ c_summary_none() {
 					colbef="\033[0;32m"
 					colaft="\033[0;00m"	
 				}
+				
+				percentmemory="00"
+				if (nodetotmem[nodes[i]] > 0) {
+					percentmemory = nodeavailmem[nodes[i]]/nodetotmem[nodes[i]]*100
+				}
 				printf "%-" maxlen "s  " colbef "%8s" colaft "  %6.2f%% %13i   %s\n", \
 					nodes[i], nodeavailcpus[nodes[i]] "/" nodetotcpus[nodes[i]], \
-					(nodeavailmem[nodes[i]]/nodetotmem[nodes[i]]*100), nodeavailmem[nodes[i]]/1024, nodeprops[nodes[i]]
+					percentmemory, nodeavailmem[nodes[i]]/1024, nodeprops[nodes[i]]
 			}
 		}
 		'
