@@ -19,6 +19,7 @@
 # load library:
 . $(dirname $0)/../shared.config.lib.sh || exit 1
 . $(dirname $0)/../shared.tabcomplete.lib.sh || exit 1
+. $(dirname $0)/../shared.helpstrings.lib.sh || exit 1
 
 ##########################################################################
 #Settings
@@ -345,55 +346,6 @@ empty_list_commands_cache() {
 #-- printing help --#
 #####################
 
-help_string() {
-	#marker function that does absolutely nothing
-	:
-}
-
-print_help_for_command() {
-	#$1: command name
-	#$2: suffix
-
-	local FCTNAME="c_${1}_${2}"
-	local DECLARE
-	DECLARE=`declare -f -p $FCTNAME` || return 1
-	echo "$DECLARE" | awk '
-		BEGIN { pr=0 }
-		/help_string/ && /";[[:space:]]*$/ {
-			# a single line help. Just print it all.
-			gsub(/^.*help_string[[:space:]]*"/,"")
-			gsub(/";[[:space:]]*$/,"")
-			print
-			exit 0
-		}
-
-		/help_string/ {
-			#beginning of the help: set flag to print other lines and remove unneccessary stuff.
-			gsub(/^.*help_string[[:space:]]*"/,"")
-			print
-			pr=1
-			next
-		}
-		
-		/";[[:space:]]*$/ {
-			#end of the help. Print last bit and exit
-			gsub(/^[[:space:]]*/,"")
-			gsub(/";[[:space:]]*$/,"")
-			print
-			pr=0
-			exit 0
-		}
-		
-		pr==1 {
-			#line in between: Remove leading space
-			gsub(/^[[:space:]]*/,"")
-			print
-			next
-		}
-	'
-	return 0
-}
-
 print_help_for_category() {
 	case "$1" in 
 		list)
@@ -420,7 +372,7 @@ print_help_for_category() {
 		local COLWIDTH=$(( $(max_command_length) + 6 - ${#cmd} ))
 		printf "   \033[0;33m%s\033[0;00m %-${COLWIDTH}s  " "$cmd" "$EXTRA"
 
-		print_help_for_command $cmd $category | sed "2,\$s/^/$WHITE/g"
+		print_help_for_command "c_${cmd}_${category}" | sed "2,\$s/^/$WHITE/g"
 	done
 }
 
