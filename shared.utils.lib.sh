@@ -26,7 +26,7 @@ waitpid() {
 find_up() {
 	#find a file in this directory or any parent directory
 	#$1: File to find
-	#returns 1 if root reached.
+	#returns 1 if root reached and file not found.
 
 	if [ -f "$1" ]; then
 		echo "$1"
