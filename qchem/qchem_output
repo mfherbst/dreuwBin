@@ -1,0 +1,124 @@
+#!/bin/bash
+
+# Script to investigate PBS jobs
+# Copyright (C) 2015 Michael F. Herbst
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# A copy of the GNU General Public License can be found in the 
+# file COPYING or at <http://www.gnu.org/licenses/>.
+
+# load library:
+. $(dirname $0)/../shared.helpstrings.lib.sh || exit 1
+
+# set this to allow @( ) and ?( ) patterns in case ... and other pathname expansions
+shopt -qs extglob
+
+##############################################################
+#--  actions  --#
+#################
+
+do_extract_opt_geo() {
+	help_string "Extract the final optimised geometry to stdout."
+
+	local FILE="$1"
+	< "$FILE" awk '
+		BEGIN {
+			pr=0
+		}
+
+		/\*\*  OPTIMIZATION CONVERGED  \*\*/ { pr=1; next }
+		pr == 1 && /^\$molecule$/ { pr=2 }
+		pr == 2 && /^\$end$/ { print; pr=0; exit }
+		pr == 2 { print }
+	'
+}
+
+do_summary() {
+	help_string "Default action: Just print a short summary"
+
+	local FILE="$1"
+	< "$FILE" awk '
+		/^[[:space:]]*Largest Abelian Subgroup/ { print "Symmetry:    " $4 }
+		$1=="SCF" && $2 == "energy"             { print "SCF energy:  " $9 }
+		$1=="MP2" && $2 == "total" &&  $3 == "energy"  { print "MP2 energy:  " $5 }
+		/[[:space:]]*\*  Thank you very much for using Q-Chem.  Have a nice day.  \*[[:space:]]*$/ { print "\nSuccessful execution" }
+	'
+}
+
+##############################################################
+#-- help --#
+############
+
+fill_list_commands_cache() {
+	[ "$COMMANDS" ] && return
+	COMMANDS=$(declare -f | sed -ne '/^do_.* ()/s/^do_\([[:graph:]]*\) ().*/\1/p' | tr '\n' ' ')
+}
+
+list_of_commands() {
+	fill_list_commands_cache
+	echo -n "$COMMANDS"
+}
+
+usage() {
+	cat <<- EOF
+	$(basename "$0") <action> <output file>
+
+	Print some things from a qchem output file
+	Actions:
+
+	EOF
+
+	for action in $(list_of_commands); do
+		echo "--${action}"
+		print_help_for_command "do_${action}"	
+		echo
+	done
+}
+
+##############################################################
+
+ACTION="$1"
+FILE="$2"
+
+if [[ "$1" == "--help" || "$1" == "-h" || -z "$1" ]]; then
+	usage
+	exit 0
+fi
+
+if [[ -z "$2" ]]; then
+	FILE="$1"
+	ACTION="--summary"
+fi
+
+if [ ! -r "$FILE" ]; then
+	echo "Cannot read qchem output file: $FILE" >&2
+	exit 1
+fi
+
+# strip of "--" in the beginning:
+ACTION=${ACTION:2}
+
+# fill command cache:
+fill_list_commands_cache
+
+# interpret action:
+case "$ACTION" in
+	#the @( ) and ?( ) patterns require extglob !!
+	@(${COMMANDS// /|})?(+([[:space:]])*))	
+		do_${ACTION} "${FILE}"
+		exit $?
+		;;
+	*)
+		echo "Unrecognised action: --${ACTION}" >&2
+		exit 1
+		;;
+esac
