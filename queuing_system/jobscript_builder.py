@@ -44,7 +44,7 @@ class hook_base(metaclass=ABCMeta):
 class copy_from_to_hook(hook_base):
     """
     Hook to copy a list of files/dirs from one directory to another.
-    All dirs are copied recursively
+    All dirs are copied recursively, all links are dereferenced.
 
     The relative paths are mainained, ie blubber/blub is copied from
     A/blubber/blub to B/blubber/blub and the 
@@ -58,8 +58,8 @@ class copy_from_to_hook(hook_base):
 
     def __generate_code_for_file(self,filename):
         return 'if [ -r "$' + self.__fromdir+ "/" + filename + '" ]; then \n' \
-                + '    CPARGS="" \n' \
-                + '    [ -d "$' + self.__fromdir+ "/" + filename + '" ] && CPARGS="-r"\n' \
+                + '    CPARGS="--dereference" \n' \
+                + '    [ -d "$' + self.__fromdir+ "/" + filename + '" ] && CPARGS="--recursive"\n' \
                 + '    DIR=$(dirname "' + filename + '")\n' \
                 + '    mkdir -p "$'+self.__todir+'/$DIR"\n' \
                 + '    cp $CPARGS "$'+ self.__fromdir+ "/" + filename + '" "$' +self.__todir+'/$DIR"\n' \
@@ -568,6 +568,8 @@ print_info() {
 }
 
 stage_in() {
+    rm -f "$SUBMIT_WORKDIR/job_not_successful"
+
     # create workdir and cd to it.
     
     echo
@@ -593,6 +595,10 @@ stage_in() {
 }
 
 stage_out() {
+    if [ "$RETURN_VALUE" != "0" ]; then
+        touch "$SUBMIT_WORKDIR/job_not_successful"
+    fi
+
     echo 
     echo ------------------------------------------------------
     echo 
