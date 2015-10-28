@@ -23,11 +23,23 @@
 shopt -qs extglob
 
 ##############################################################
+#--  checks  --#
+################
+
+was_run_successful() {
+	# return 0/1 if the qchem run leading to $1 was successful or not.
+
+	local FILE="$1"
+	< "$FILE" grep -q '[[:space:]]*\*  Thank you very much for using Q-Chem.  Have a nice day.  \*[[:space:]]*$'
+}
+
+
+##############################################################
 #--  actions  --#
 #################
 
-do_extract_opt_geo() {
-	help_string "Extract the final optimised geometry to stdout."
+do_opt_geo() {
+	help_string "Extract the final optimised geometry to stdout in zmat form."
 
 	local FILE="$1"
 	< "$FILE" awk '
@@ -39,6 +51,44 @@ do_extract_opt_geo() {
 		pr == 1 && /^\$molecule$/ { pr=2 }
 		pr == 2 && /^\$end$/ { print; pr=0; exit }
 		pr == 2 { print }
+	'
+}
+
+do_std_orientation_xyz() {
+	help_string "Extract the final optimised geometry to stdout in xyz form."
+
+	local FILE="$1"
+	< "$FILE" awk '
+		BEGIN {
+			pr=0
+		}
+
+		/Standard Nuclear Orientation \(Angstroms\)/ { pr=1; next }
+
+		/-----------------------------------------------------------$/ && pr==2 { 
+			pr=0; 
+			exit
+       		}
+
+		$1 ~ /^[0-9]+$/ && pr>0 { 
+			atoms[$1]=$2; 
+			coords[$1]=sprintf("%14f  %14f  %14f",$3,$4,$5)
+			maxatom=$1
+			pr=2
+		}
+
+		END {
+			if ( pr != 0 ) {
+				print "Something went wrong: Molecule not closed." > "/dev/stderr"
+				exit 1
+			}
+
+			print maxatom
+			print ""
+			for (id in atoms) {
+				printf "%3s  %s\n", atoms[id], coords[id]
+			}
+		}
 	'
 }
 
@@ -102,6 +152,11 @@ fi
 if [ ! -r "$FILE" ]; then
 	echo "Cannot read qchem output file: $FILE" >&2
 	exit 1
+fi
+
+# Check if the qchem run was succesful:
+if ! was_run_successful "$FILE"; then
+	echo "WARNING: This qchem run seems to be unsuccessful!" >&2
 fi
 
 # strip of "--" in the beginning:
