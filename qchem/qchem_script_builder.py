@@ -272,9 +272,10 @@ class v40(jsb.jobscript_builder):
                         except ValueError:
                             continue
 
-                        if data.no_nodes() < no:
+                        if data.no_procs() < no:
+                            # we have less processors that threads requested 
                             node = qd.node_type()
-                            node.no_procs = no - data.no_nodes()
+                            node.no_procs = no - data.no_procs()
                             data.add_node_type(node)
 
                         continue
