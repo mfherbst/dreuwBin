@@ -18,6 +18,21 @@
 
 HOST="ccserv1"
 
+check_ssh_config() {
+	if [ -f "$HOME/.ssh/config" ] && ! < $HOME/.ssh/config grep -q "Host $HOST"; then
+		cat <<-EOF
+			This script can only work properly if there exists a 
+			      Host $HOST
+			         Hostname $HOST.domain
+			         Port <Portnumber>
+			section in the $HOME/.ssh/config file. 
+			Please add this section
+		EOF
+		exit 1
+	fi
+} && check_ssh_config
+
+
 if [ "$HOSTNAME" != "$HOST" ];then
 	QUOTA="ssh $HOST quota"
 else
