@@ -6,7 +6,7 @@ _qchem_output() {
 	COMPREPLY=()
 
 	local HELPOPT="--help -h"
-	local ACTIONS="--opt_geo --summary --std_orientation_xyz"
+	local ACTIONS="--opt_geo --summary --std_orientation_xyz --extract_input_molecule"
 	if [[ "$cur" == -* ]]; then
 		COMPREPLY=( $( compgen -W "$HELPOPT $ACTIONS " -- "$cur" ) )
 		return 0
