@@ -224,3 +224,4 @@ ConfigPut() {
 ConfigPath() {
 	#echos the path of the config.
 	echo "$CONFFILE"
+}
