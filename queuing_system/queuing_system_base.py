@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 #
 # A copy of the GNU General Public License can be found in the 
-# file COPYING or at <http://www.gnu.org/licenses/>.
+# file LICENCE or at <http://www.gnu.org/licenses/>.
 
 from abc import ABCMeta, abstractmethod
 from queuing_system.queuing_system_data import queuing_system_data
