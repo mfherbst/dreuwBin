@@ -396,7 +396,7 @@ class jobscript_builder:
         Adds required entries to an argparse Object supplied
         """
 
-        argparse.add_argument("--qsys-args", "-q", metavar="args", default=None, type=str,help="Extra options for the queuing system (e.g. \"-l mem=40 -l vmem=20\")." )
+        argparse.add_argument("--qsys-args", "-q", metavar="args", default=None, type=str,help="Extra options for the queuing system (e.g. \"-l mem=40 -l vmem=20\" or \"-l intel\")." )
         argparse.add_argument("--workdir", "-d", metavar="dir", default=None, type=str, help="Change job execution directory on the node")
         argparse.add_argument("--scratchdir", metavar="dir", default=None, type=str, help="Change the path of the node-local scratch directory")
         argparse.add_argument("--mail", "-m", metavar="user@host", default=None, type=str, help="EMail Address to which messages are sent")
