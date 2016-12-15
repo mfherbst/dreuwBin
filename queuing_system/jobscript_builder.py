@@ -702,5 +702,15 @@ if __name__ == "__main__":
 
     print( j.build_script() )
 
+    print()
+    print("---------")
+    print()
+
+    argslist=["--priority","0","--wt", "12:34:45", "--mem", "56mb", "--vmem", "120mb", "--np", "2", "--name", "blubber" ]
+    args = parser.parse_args(argslist)
+    j.examine_args(args)
+    print(argslist)
+    print(j.queuing_system_data)
+
 
     #print("Unit Test passed")

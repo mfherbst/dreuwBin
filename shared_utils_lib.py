@@ -135,14 +135,15 @@ def interpret_string_as_time_interval(string):
         else:
             raise argparse.ArgumentTypeError(string + " is not a valid time value: Expected one of s,m,h,d,w,y as time suffix")
     else:
-            li=timestr.split(":")
+            li=string.split(":")
 
             #[[[days:]hours:]minutes:]seconds
 
-            self.seconds = int(li[-1])
+            n = int(li[-1])
             if len(li) > 1:
-                self.seconds += 60*int(li[-2])
+                n += 60*int(li[-2])
             if len(li) > 2:
-                self.seconds += 60*60*int(li[-3])
+                n += 60*60*int(li[-3])
             if len(li) > 3:
-                self.seconds += 24*60*60*int(li[-4])
+                n += 24*60*60*int(li[-4])
+            return n
