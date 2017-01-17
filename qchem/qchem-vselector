@@ -16,6 +16,9 @@
 # A copy of the GNU General Public License can be found in the 
 # file LICENCE or at <http://www.gnu.org/licenses/>.
 
+#TODO Automatically have versions available that have module files in /opt/Modules
+#     Offer some defaults in ask_for_default_parameters
+
 # load library:
 . $(dirname $0)/../shared.config.lib.sh || exit 1
 . $(dirname $0)/../shared.utils.lib.sh || exit 1
@@ -146,7 +149,14 @@ list_versions() {
 }
 
 ask_user_for_version() {
-	# ask the user for the version to execute and fill VERSION variabl
+	# ask the user for the version to execute and fill VERSION variable
+	# No asking will be done if there is only one available version
+
+	local COUNT=$(cat_versions | grep -c "^")
+	if [ "$COUNT" == 1 ]; then
+		VERSION=$(cat_versions)
+		return 0
+	fi
 	
 	list_versions >&2
 
