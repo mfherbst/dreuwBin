@@ -500,6 +500,17 @@ amend_qstat() {
 		{ print }'
 }
 
+get_accessible_nodes () {
+	qnodes | awk '
+       		BEGIN {curnode="";}
+	       	
+		curnode != "" && /^[[:space:]]*$/ {curnode="";next}
+		/^[[:graph:]]+$/ { curnode=$0; next }
+		
+		curnode != "" && $1 == "state" && $3 != "offline" { print curnode; curnode=""; next }
+	'
+}
+
 #########################################################################
 #-- shell --#
 #############
@@ -735,15 +746,7 @@ c_joblist_none() {
 c_diskspace_none() {
 	help_string "Print the space you occupy in /scratch and /lscratch on each node"
 
-	for node in $(
-	qnodes | awk '
-       		BEGIN {curnode="";}
-	       	
-		curnode != "" && /^[[:space:]]*$/ {curnode="";next}
-		/^[[:graph:]]+$/ { curnode=$0; next }
-		
-		curnode != "" && $1 == "state" && $3 != "offline" { print curnode; curnode=""; next }
-	'); do
+	for node in $(get_accessible_nodes); do
 		ssh $node "
 			DIRS=
 			[ -d /scratch/$USER ] && DIRS=\"\$DIRS /scratch/$USER\"
@@ -753,6 +756,13 @@ c_diskspace_none() {
 			du -sh \$DIRS | sed 's/^/   /g; s/\t/  /g' | tr '\\n' ' '
 			echo"
 	done
+}
+
+c_cleanup_none() {
+	help_string "Interactively clean up scratch files located in /lscratch and
+	/scratch on each node"
+
+	"$(dirname $0)/cleanup_scratch.py" $(get_accessible_nodes)
 }
 
 c_summary_none() {
