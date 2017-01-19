@@ -291,6 +291,8 @@ list_commands() {
 	list_commands_list
 	echo -n " "
 	list_commands_node
+	echo -n " "
+	list_commands_nodelist
 }
 
 list_commands_none() {
@@ -317,6 +319,12 @@ list_commands_node() {
 	echo -n "$COMMANDS_NODE"
 }
 
+list_commands_nodelist() {
+	#get list of commands that require a list of job ids
+	fill_list_commands_cache
+	echo -n "$COMMANDS_NODELIST"
+}
+
 max_command_length(){
 	#get maximum number of characters a command has
 	fill_list_commands_cache
@@ -330,6 +338,7 @@ fill_list_commands_cache() {
 	COMMANDS_ID=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_id ().*/\1/p' | tr '\n' ' ')
 	COMMANDS_LIST=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_list ().*/\1/p' | tr '\n' ' ')
 	COMMANDS_NODE=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_node ().*/\1/p' | tr '\n' ' ')
+	COMMANDS_NODELIST=$(declare -f | sed -ne '/^c_.* ()/s/^c_\([[:graph:]]*\)_nodelist ().*/\1/p' | tr '\n' ' ')
 
 	MAX_COMMAND_LENGTH=`list_commands | tr ' ' '\n' | wc --max-line-length`
 }
@@ -339,6 +348,7 @@ empty_list_commands_cache() {
 	COMMANDS_ID=
 	COMMANDS_LIST=
 	COMMANDS_NODE=
+	COMMANDS_NODELIST=
 	MAX_COMMAND_LENGTH=
 }
 
@@ -355,6 +365,9 @@ print_help_for_category() {
 			EXTRA="<id>  "
 			;;
 		none)
+			EXTRA="      "
+			;;
+		nodelist)
 			EXTRA="      "
 			;;
 		node)
@@ -502,11 +515,11 @@ amend_qstat() {
 
 get_accessible_nodes () {
 	qnodes | awk '
-       		BEGIN {curnode="";}
-	       	
+		BEGIN {curnode="";}
+
 		curnode != "" && /^[[:space:]]*$/ {curnode="";next}
 		/^[[:graph:]]+$/ { curnode=$0; next }
-		
+
 		curnode != "" && $1 == "state" && $3 != "offline" { print curnode; curnode=""; next }
 	'
 }
@@ -624,6 +637,10 @@ run_command() {
 		@(${COMMANDS_LIST// /|})?(+([[:space:]])*))
 			CMD_CATEGORY="list"
 			;;
+		@(${COMMANDS_NODELIST// /|})?(+([[:space:]])*))
+			c_${CMD}_nodelist $(get_accessible_nodes)
+			return $?
+			;;
 		*)
 			 echo "Unrecognised command: $CMD" >&2
 			 echo "Type help for a list of commands" >&2
@@ -701,6 +718,8 @@ AWK_TOSEC='
 #            - "_list" for a list of job ids.
 #            - "_node" for the node as the first arg 
 #                      and the job id as the second argument
+#            - "_nodelist" A list of all active and available nodes
+#                      as the passed arguments
 #      - they should contain a line with a help string starting with
 #        "help_string" that documents the commands action shortly
 
@@ -713,7 +732,7 @@ c_help_none() {
 	help_string "print this help"
 
 	echo "The following commands are implemented:"
-	for category in none id node list; do
+	for category in none nodelist id node list; do
 		print_help_for_category $category
 	done
 
@@ -741,28 +760,6 @@ c_alias_none() {
 c_joblist_none() {
 	help_string "print all jobs owned by you."
 	qstat -nu $USER | amend_qstat
-}
-
-c_diskspace_none() {
-	help_string "Print the space you occupy in /scratch and /lscratch on each node"
-
-	for node in $(get_accessible_nodes); do
-		ssh $node "
-			DIRS=
-			[ -d /scratch/$USER ] && DIRS=\"\$DIRS /scratch/$USER\"
-			[ -d /lscratch/$USER ] && DIRS=\"\$DIRS /lscratch/$USER\"
-			[ -z \"\$DIRS\" ] && exit
-			echo -n \"\$HOSTNAME  \"
-			du -sh \$DIRS | sed 's/^/   /g; s/\t/  /g' | tr '\\n' ' '
-			echo"
-	done
-}
-
-c_cleanup_none() {
-	help_string "Interactively clean up scratch files located in /lscratch and
-	/scratch on each node"
-
-	"$(dirname $0)/cleanup_scratch.py" $(get_accessible_nodes)
 }
 
 c_summary_none() {
@@ -973,6 +970,28 @@ c_delete_list() {
 #}
 
 #TODO command qstat that does pattern matching on supplied arg and shows matching entries of the queue
+
+c_diskspace_nodelist() {
+	help_string "Print the space you occupy in /scratch and /lscratch on each node"
+
+	for node in $@; do
+		ssh $node "
+			DIRS=
+			[ -d /scratch/$USER ] && DIRS=\"\$DIRS /scratch/$USER\"
+			[ -d /lscratch/$USER ] && DIRS=\"\$DIRS /lscratch/$USER\"
+			[ -z \"\$DIRS\" ] && exit
+			echo -n \"\$HOSTNAME  \"
+			du -sh \$DIRS | sed 's/^/   /g; s/\t/  /g' | tr '\\n' ' '
+			echo"
+	done
+}
+
+c_cleanup_nodelist() {
+	help_string "Interactively clean up scratch files located in /lscratch and
+	/scratch on each node"
+
+	"$(dirname $0)/cleanup_scratch.py" $@
+}
 
 #########################################################################
 #-- Start of script --#
