@@ -1,6 +1,5 @@
 _qchem_send_job() {
 	local cur
-	local prev
 	cur=${COMP_WORDS[COMP_CWORD]}
 
 	COMPREPLY=()
