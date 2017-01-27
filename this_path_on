@@ -35,7 +35,7 @@ while [ "$1" ]; do
 		"-s"|"--strip")
 			shift
 			if [ ! -d "$1" ]; then
-				echo "Not a valid stripping path: $1" >&2
+				echo "Not a valid stripping path: '$1'" >&2
 				exit 1
 			fi
 			STRIP="$( readlink -f "$1")"
@@ -56,13 +56,19 @@ while [ "$1" ]; do
 	shift
 done
 
+if [ -z "$TOHOST" ]; then
+	echo "Did not specify a host to ssh to as last argument" >&2
+	exit 1
+fi
+
 if [[ "$HOSTNAME" == "$TOHOST" ]]; then
 	echo "You are already on this host." >&2
 	exit 1
 fi
 
 if ! pwd | grep -q "^$STRIP"; then
-	echo "Only paths below $STRIP are valid." >&2
+	echo "Only paths below the stripping path ($STRIP) are valid." >&2
+	echo "You can change the stripping path via the flag -s" >&2
 	exit 1
 fi
 
