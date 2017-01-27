@@ -1,0 +1,71 @@
+#!/bin/bash
+
+STRIP="$HOME"
+PREFIX="$HOME"
+
+usage() {
+	cat <<- EOF
+	$(basename "$0") [<options>] <host>
+
+	ssh to a remote host and start an interactive shell at
+	some directory derived from the current working directory
+	on this side.
+
+	-p
+	--prefix    Prefix to add on the remote side
+
+	-s
+	--strip     Prefix to strip on the current working
+	            directory on this side.
+
+	Roughly speaking the path to cd on the remote side will be
+	PWD, with the value of --strip replaced by --prefix.
+	By default the strip and prefix values will both be
+	$HOME, such that one
+	effectively cds into the same directory on the remote side.
+	EOF
+}
+
+while [ "$1" ]; do
+	case "$1" in
+		"-h"|"--help")
+			usage
+			exit 0
+			;;
+		"-s"|"--strip")
+			shift
+			if [ ! -d "$1" ]; then
+				echo "Not a valid stripping path: $1" >&2
+				exit 1
+			fi
+			STRIP="$( readlink -f "$1")"
+			;;
+		"-p"|"--prefix")
+			shift
+			PREFIX="$1"
+			;;
+		-*)
+			echo "Unknown argument: $1" >&2
+			exit 1
+			;;
+		*)
+			TOHOST="$1"
+			break
+			;;
+	esac
+	shift
+done
+
+if [[ "$HOSTNAME" == "$TOHOST" ]]; then
+	echo "You are already on this host." >&2
+	exit 1
+fi
+
+if ! pwd | grep -q "^$STRIP"; then
+	echo "Only paths below $STRIP are valid." >&2
+	exit 1
+fi
+
+RPATH="$PREFIX/${PWD##$STRIP}"
+ssh -t $TOHOST "cd $RPATH; bash -il"
+exit $?
