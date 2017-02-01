@@ -135,7 +135,7 @@ class v40_qchem_payload(jsb.hook_base):
             string += "echo ------------------------------------------------------\n"
             string += "echo\n\n"
 
-            string += 'echo "Files in $QCSCRATCH/'+qchem_args.savedir+ ': \n'
+            string += 'echo "Files in $QCSCRATCH/'+qchem_args.savedir+ '": \n'
             string += '(\n'
             string += '    cd "$QCSCRATCH/' +qchem_args.savedir+ '"\n'
             string += "    ls -l | sed 's/^/    /g' \n"
