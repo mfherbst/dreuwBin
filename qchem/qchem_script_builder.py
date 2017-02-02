@@ -243,6 +243,10 @@ class v40(jsb.jobscript_builder):
                     else:
                         print("Warning: Ignoring number of processes specified in input file via \"!QSYS np=\", since already specified on commandline.")
 
+                # NOTE:
+                # From here on everything is normalised to lower case!
+                line = line.lower()
+
                 if line.startswith("$end"):
                     section=None
                     continue
@@ -257,7 +261,7 @@ class v40(jsb.jobscript_builder):
                         continue
                 
                 elif section == "molecule":
-                    if line.startswith("READ"):
+                    if line.startswith("read"):
                         line = line[4:].strip()
                         self.__files_copy_in.append(line)
                     continue
