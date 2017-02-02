@@ -189,11 +189,24 @@ class v40(jsb.jobscript_builder):
         else:
             argparse.epilog += ("\n" + epilog)
 
-    def _add_default_copy_out_files(self):
-        pass
-        # self.__files_copy_out.append("")
-        # TODO Ideas for files to copy out:
-        # Test.FChk
+    def _qchem_work_files(self):
+        """
+        Returns a list of possible files which are generated
+        by this qchem job.
+        """
+        # The ret list should be filled with files to be copied.
+        # Note that existance is checked automatically, i.e.
+        # if a file is listed here, but is not created by qchem
+        # or does not exist after the run, no error is produced.
+        ret=[]
+
+        if self.__qchem_args.outfile is not None:
+            ret.append(self.__qchem_args.outfile)
+
+        # Copy fchk file:
+        ret.append(self.__qchem_args.infile + ".fchk")
+        
+        # TODO possible other ideas:
         # plot.attach.alpha
         # plot.detach.alpha
         # plot.attach.beta
@@ -206,6 +219,21 @@ class v40(jsb.jobscript_builder):
         # plot.hf
         # plot.mo
         # AIMD (directory)
+
+        return ret
+
+    def _qchem_scratch_files(self):
+        """
+        Returns a list of possible files which should be kept
+        if they are generated in the scratch directory
+        """
+        ret=[]
+
+        # Copy plots:
+        if self.__qchem_args.savedir:
+            ret.append(self.__qchem_args.savedir + "/plots")
+
+        return ret
 
     def _parse_infile(self,infile):
         """
@@ -353,22 +381,25 @@ class v40(jsb.jobscript_builder):
         # set jobname if not yet set:
         if self.queuing_system_data.job_name is None:
             self.queuing_system_data.job_name = filename
-        
-        # files to copy in or out
+
+        # files to copy in
         self.__files_copy_in =[]
         self.__files_copy_in.append(self.__qchem_args.infile)
-
-        self.__files_copy_out=[]
-        self._add_default_copy_out_files()
-
-        self.__files_copy_error_out=[]
-        self.__files_copy_error_out.append(self.__qchem_args.outfile)
 
         # parse infile 
         self._parse_infile(self.__qchem_args.infile)
 
-        if self.__qchem_args.outfile is not None:
-            self.__files_copy_out.append(self.__qchem_args.outfile)
+        # File to copy out from working directory of node
+        # on succesful execution.
+        self.__files_copy_work_out=self._qchem_work_files()
+
+        # Files to copy out from scratch directory of node
+        # on successful execution
+        self.__files_copy_scratch_out=self._qchem_scratch_files()
+
+        # Files to copy out from working directory of node
+        # if an error occurrs
+        self.__files_copy_error_out=[ self.__qchem_args.outfile ]
 
     def build_script(self):
         if self.__qchem_args.qchem_executable is None:
@@ -380,9 +411,15 @@ class v40(jsb.jobscript_builder):
         if self.__qchem_args.save_flag and self.__qchem_args.savedir is None:
             raise jsb.DataNotReady("If save_flag is set, we need a savedir as well")
 
+
         self.add_payload_hook(jsb.copy_in_hook(self.__files_copy_in),-1000)
         self.add_payload_hook(v40_qchem_payload(self.__qchem_args))
-        self.add_payload_hook(jsb.copy_out_hook(self.__files_copy_out),1000)
+
+        # Hook to copy files workdir of node -> submitdir
+        self.add_payload_hook(jsb.copy_out_hook(self.__files_copy_work_out, fromdir="WORK"),900)
+
+        # Hook to copy files scratchdir of node -> submitdir
+        self.add_payload_hook(jsb.copy_out_hook(self.__files_copy_scratch_out, fromdir="SCRATCH"),1000)
 
         self.add_error_hook(jsb.copy_out_hook(self.__files_copy_error_out),-1000)
 

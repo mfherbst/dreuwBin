@@ -110,17 +110,28 @@ class copy_in_hook(hook_base):
 
 class copy_out_hook(hook_base):
     """
-    Hook to copy a list of files/dirs from the server working directory
-    from the submit workdir if the files exist
+    Hook to copy a list of files/subdirs from one directory of the
+    node to the submit workdir if the files exist
     All dirs are copied recursively. 
 
-    The relative paths are mainained, ie blubber/blub is copied from
+    By default files are copied from the node's working directory,
+    i.e. SERVER_WORKDIR.
+
+    The relative paths are mainained, for example if we copy
+    from SERVER_WORKDIR, then the file called "blubber/blub" is copied from
     SERVER_WORKDIR/blubber/blub to SUBMIT_WORKDIR/blubber/blub and the
-    target dir is created if neccessary
+    target dir is created if neccessary.
+
+    Valid values for fromdir are
+        "WORK"      use the job's working directory SERVER_WORKDIR
+        "SCRATCH"   use the job's scratch directory SERVER_SCRATCHDIR
     """
-    def __init__(self, files):
+    def __init__(self, files, fromdir="WORK"):
         super().__init__()
         self.__files = files
+
+        # If None, then read node_work_dir from environment
+        self.__fromdir = fromdir
 
     def generate(self,data,params,calc_env):
         """
@@ -137,7 +148,16 @@ class copy_out_hook(hook_base):
         if not isinstance(calc_env,calculation_environment):
             raise TypeError("calc_env not of type calculation_environment")
 
-        return copy_from_to_hook(calc_env.node_work_dir,params.submit_workdir,self.__files)\
+        fromdir_actual = ""
+        if self.__fromdir == "WORK":
+            fromdir_actual = calc_env.node_work_dir
+        elif self.__fromdir == "SCRATCH":
+            fromdir_actual = calc_env.node_scratch_dir
+        else:
+            raise ValueError("The value passed to fromdir upon construction (==" \
+                    + str(self.__fromdir) + ") of this class is not valid.")
+
+        return copy_from_to_hook(fromdir_actual,params.submit_workdir,self.__files)\
                 .generate(data,params,calc_env)
 
 #######################################################################
