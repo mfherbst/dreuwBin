@@ -6,13 +6,13 @@ Please report all bugs or suggestions on [github](https://github.com/mfherbst/dr
 or send them directly to the principle author.
 
 ## Other contributors
-As any open source project, this script package profits as well
-from many contributions of other authors. This ranges from
-simple feature suggestions to whole scripts implementing
-new functionality.  
+Similar to all kinds of open source projects, this script package
+profits from quite some contributions of other authors as well.
+Some of them have only contributed simple feature suggestions,
+whilst others have implemented full scripts with new functionality.  
 
 People who have contributed to ``dreuwBin`` so far
 (in no particular order):
 - **Adrian Dempwolff**: Script to delete temporary files
-- **Manuel Hodecker**: Suggestions for qchem jobsscript)
+- **Manuel Hodecker**: Suggestions for qchem jobsscript
 - **Nico Spiller**: Suggestions for qchem jobscript
