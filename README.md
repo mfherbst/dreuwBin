@@ -77,3 +77,6 @@ coding guidelines.
 
 8. If in doubt ask the user or abort. Avoid Philippians or 
    Danielisms. ;)
+
+## Authors
+- For a list of authors and their contribution see [AUTHORS.md](AUTHORS.md).
