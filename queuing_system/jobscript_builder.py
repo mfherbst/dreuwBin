@@ -591,20 +591,28 @@ stage_in() {
     rm -f "$SUBMIT_WORKDIR/job_not_successful"
 
     # create workdir and cd to it.
-    
-    echo
-    echo Calculation working directory: $NODE_WORKDIR
 
     if [ -d "$NODE_WORKDIR" ]; then
         local NEWWORKDIR="${NODE_WORKDIR}_${JOBID}"
-        echo
+        echo >&2
         echo "Workdir $NODE_WORKDIR already exists! Proceeding with $NEWWORKDIR." >&2
         NODE_WORKDIR=$NEWWORKDIR
     fi
 
+    if [ -d "$NODE_SCRATCHDIR" ]; then
+        local NEWSCRATCHDIR="${NODE_SCRATCHDIR}_${JOBID}"
+        echo >&2
+        echo "Scratchdir $NODE_SCATCHDIR already exists! Proceeding with $NEWSCRATCHDIR." >&2
+        NODE_SCRATCHDIR=$NEWSCRATCHDIR
+    fi
+
+    echo
+    echo "Calculation working directory: $NODE_WORKDIR"
+    echo "            scratch directory: $NODE_SCATCHDIR"
+
     # create scratch dir and work dir
     if ! mkdir -m700 -p $NODE_SCRATCHDIR $NODE_WORKDIR; then
-        echo "Could not create scratch($NODE_SCRATCHDIR) or workdir($NODE_WORKDIR)"
+        echo "Could not create scratch($NODE_SCRATCHDIR) or workdir($NODE_WORKDIR)" >&2
         exit 1
     fi
     cd $NODE_WORKDIR
