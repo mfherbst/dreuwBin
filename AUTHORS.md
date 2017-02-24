@@ -14,5 +14,6 @@ whilst others have implemented full scripts with new functionality.
 People who have contributed to ``dreuwBin`` so far
 (in no particular order):
 - **Adrian Dempwolff**: Script to delete temporary files
+- **Georg Ebert**: TDDFT/TDA excited states parser for qchem_output
 - **Manuel Hodecker**: Suggestions for qchem jobsscript
 - **Nico Spiller**: Suggestions for qchem jobscript

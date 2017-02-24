@@ -120,6 +120,48 @@ do_summary() {
 	'
 }
 
+do_excited_states() {
+	help_string "Extract excited states from TDDFT\/TDA calculation"
+
+	local FILE="$1"
+	< "$FILE" awk '
+	BEGIN {
+		pr=0;
+		statestotal=0
+	}
+
+	/TDDFT\/TDA Excitation Energies/ { pr=1; next }
+
+	/Excited state/ && pr==1 {
+		statestotal++;
+		stateno[statestotal]=substr($3, 1)
+		energy[statestotal]=$8;
+		pr=2
+	}
+
+	$1 ~ /^Multiplicity/ && pr==2 {
+		multip[statestotal]=$2;
+	}
+
+	$1 ~ /^Strength/ && pr==2 {
+		oscstr[statestotal]=$3;
+		pr=1
+	}
+
+	/^---------------------------------------------------$/ && pr=1 {
+	        pr=0; next
+	}
+
+	END {
+		printf("%5s  %12s  %12s  %12s\n", "State",
+			"Exc.energy(eV)", "Osc.Strength", "Multiplicity");
+		for (state=1; state<=statestotal; state++)
+		printf("%5s  %12s  %12f  %12s\n", stateno[state],
+			energy[state], oscstr[state], multip[state])
+	}
+	'
+}
+
 ##############################################################
 #-- help --#
 ############
