@@ -13,7 +13,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# A copy of the GNU General Public License can be found in the 
+# A copy of the GNU General Public License can be found in the
 # file LICENCE or at <http://www.gnu.org/licenses/>.
 
 # load library:
@@ -65,12 +65,12 @@ do_std_orientation_xyz() {
 
 		/Standard Nuclear Orientation \(Angstroms\)/ { pr=1; next }
 
-		/-----------------------------------------------------------$/ && pr==2 { 
-			pr=0; 
+		/-----------------------------------------------------------$/ && pr==2 {
+			pr=0;
 			exit
-       		}
+		}
 
-		$1 ~ /^[0-9]+$/ && pr>0 { 
+		$1 ~ /^[0-9]+$/ && pr>0 {
 			atoms[$1]=$2; 
 			coords[$1]=sprintf("%14f  %14f  %14f",$3,$4,$5)
 			maxatom=$1
@@ -93,19 +93,19 @@ do_std_orientation_xyz() {
 }
 
 do_extract_input_molecule() {
- 	help_string "Extract the input geometry (in xyz or ZMat form) to stdout."
- 
- 	local FILE="$1"
- 	< "$FILE" awk '
- 		BEGIN {
- 			pr=0
- 		}
- 
- 		/User input:/ { pr=1; next }
- 		pr == 1 && /^\$molecule$/ { pr=2 }
- 		pr == 2 && /^\$end$/ { print; pr=0; exit }
- 		pr == 2 { print }
- 	'
+	help_string "Extract the input geometry (in xyz or ZMat form) to stdout."
+
+	local FILE="$1"
+	< "$FILE" awk '
+		BEGIN {
+			pr=0
+		}
+
+		/User input:/ { pr=1; next }
+		pr == 1 && /^\$molecule$/ { pr=2 }
+		pr == 2 && /^\$end$/ { print; pr=0; exit }
+		pr == 2 { print }
+	'
 }
 
 do_summary() {
@@ -187,7 +187,7 @@ usage() {
 
 	for action in $(list_of_commands); do
 		echo "--${action}"
-		print_help_for_command "do_${action}"	
+		print_help_for_command "do_${action}"
 		echo
 	done
 }
@@ -225,8 +225,8 @@ fill_list_commands_cache
 
 # interpret action:
 case "$ACTION" in
-	#the @( ) and ?( ) patterns require extglob !!
-	@(${COMMANDS// /|})?(+([[:space:]])*))	
+	# the @( ) and ?( ) patterns require extglob !!
+	@(${COMMANDS// /|})?(+([[:space:]])*))
 		do_${ACTION} "${FILE}"
 		exit $?
 		;;
