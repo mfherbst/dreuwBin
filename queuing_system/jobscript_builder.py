@@ -512,6 +512,27 @@ class jobscript_builder:
         params = qsys.get_environment()
         environ = calculation_environment()
 
+        # If we still have no nodes to run on up to this
+        # point we add one. A more sensible way to deal with
+        # this would be to have a default in the config, but
+        # in the current mechanism this cannot be overwritten
+        # (since commandline arguments only add extra nodes but
+        # allow not to amend the number of processors which are
+        # used on a particular node.
+        #
+        # TODO Later one would probably have a two-stage parser
+        #      one which builds up some intermediate structure
+        #      describing what the user wants and only at the time
+        #      of writing the script in this function this would
+        #      be translated into an actual list of nodes and
+        #      processors to use ... but I cannot be bothered to
+        #      do this right now, so this is a quick fix for the
+        #      warning that there is no node available.
+        if data.no_nodes() == 0:
+            node = qd.node_type()
+            node.no_procs = 1
+            data.add_node_type(node)
+
         # check if data is ready:
         if not qsys.is_ready_for_submission(data):
             raise DataNotReady(qsys.why_not_ready_for_submission(data))

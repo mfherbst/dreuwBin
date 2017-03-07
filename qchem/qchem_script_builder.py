@@ -305,7 +305,7 @@ class v40(jsb.jobscript_builder):
                             continue
 
                         if data.no_procs() < no:
-                            # we have less processors that threads requested 
+                            # we have less processors than threads requested
                             node = qd.node_type()
                             node.no_procs = no - data.no_procs()
                             data.add_node_type(node)
@@ -315,7 +315,7 @@ class v40(jsb.jobscript_builder):
                     if line.startswith("mem_total"):
                         # memory in mb
                         line = line[9:].strip()
-                        
+
                         no=0
                         try:
                             no = int(line)
@@ -328,7 +328,7 @@ class v40(jsb.jobscript_builder):
                             data.virtual_memory = no*1024*1024 #value is in MB
                         continue
                 # end if
-            # end for 
+            # end for
 
     def examine_args(self,args):
         """
