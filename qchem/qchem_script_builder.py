@@ -56,7 +56,7 @@ def determine_qchem_path(version_string=None):
 
 #########################################################
 #--  QChem 4.0  --#
-#####ü#############
+###################
 
 class v40_qchem_args():
     def __init__(self):
@@ -64,8 +64,7 @@ class v40_qchem_args():
         self.outfile=None #str or None, Q-Chem Output filename
         self.save_flag=None #bool, should the -save option be passed to Q-Chem
         self.savedir=None #str or None, the directory to use as the qchem savedir
-        self.np_flag=None #bool, should the -np option be passed to Q-Chem
-        self.nt_flag=None #bool, should the -nt option be passed to Q-Chem
+        self.np_flag=None #bool, should the -np option be passed to Q-Chem instead of the -nt flag
         self.qchem_executable=None #str, Q-Chem executable to use
         self.use_perf=None #bool, should perf or time be used to monitor the Q-Chem run
 
@@ -96,10 +95,12 @@ class v40_qchem_payload(jsb.hook_base):
         args=""
         if qchem_args.save_flag:
             args += " -save"
-        if qchem_args.np_flag:
-            args += " -np " + str(data.no_procs())
-        if qchem_args.nt_flag:
-            args += " -nt " + str(data.no_procs())
+        if data.no_procs() > 1:
+            if qchem_args.np_flag:
+               args += " -np " + str(data.no_procs())
+            else:
+               args += " -nt " + str(data.no_procs())
+
         args += ' "' + qchem_args.infile + '"'
         if qchem_args.outfile is not None:
             args += ' "' + qchem_args.outfile + '"'
@@ -175,8 +176,7 @@ class v40(jsb.jobscript_builder):
         argparse.add_argument("--out",metavar="file",default=None,type=str, help="Q-Chem Output filename (Default: infile + \".out\")")
         argparse.add_argument("--save",default=False, action='store_true', help="Pass the -save option to qchem.")
         argparse.add_argument("--savedir", metavar="dir", default=None, type=str, help="The directory to use as the qchem savedir")
-        argparse.add_argument("--np-to-qchem", default=False,action='store_true',help="Pass the -np option followed by the number of processors to qchem (MPI runs).")
-        argparse.add_argument("--nt-to-qchem", default=False,action='store_true',help="Pass the -nt option followed by the number of processors to qchem (MP runs).")
+        argparse.add_argument("--np-to-qchem", default=False,action='store_true',help="Instead of passing the -nt option to Q-Chem on parallel runs, pass the -np option followed by the number of processors to qchem (for MPI runs).")
         argparse.add_argument("--version", default=None, type=str, help="Version string identifying the Q-Chem version to be used.")
         argparse.add_argument("--perf", default=False, action='store_true',help="Use time or perf to montitor the memory/cpu usage of Q-Chem.")
 
@@ -287,7 +287,7 @@ class v40(jsb.jobscript_builder):
                     if line.startswith("$rem"):
                         section="rem"
                         continue
-                
+
                 elif section == "molecule":
                     if line.startswith("read"):
                         line = line[4:].strip()
@@ -358,7 +358,6 @@ class v40(jsb.jobscript_builder):
         self.__qchem_args.save_flag=args.save
         self.__qchem_args.savedir = args.savedir
         self.__qchem_args.np_flag=args.np_to_qchem
-        self.__qchem_args.nt_flag=args.nt_to_qchem
         self.__qchem_args.use_perf = args.perf
 
         if args.version is not None:
@@ -369,7 +368,7 @@ class v40(jsb.jobscript_builder):
 
         # split .in extension from filename
         filename, extension =  os.path.splitext(self.__qchem_args.infile)
-        if extension != "in":
+        if not extension in [ ".in", ".qcin" ]:
             filename = self.__qchem_args.infile
 
         # set outfile if not provided:
@@ -407,7 +406,7 @@ class v40(jsb.jobscript_builder):
 
         if self.__qchem_args.outfile is None:
             raise jsb.DataNotReady("No outputfile provided")
-        
+
         if self.__qchem_args.save_flag and self.__qchem_args.savedir is None:
             raise jsb.DataNotReady("If save_flag is set, we need a savedir as well")
 
