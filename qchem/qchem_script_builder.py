@@ -364,7 +364,12 @@ class v40(jsb.jobscript_builder):
             try:
                 self.__qchem_args.qchem_executable = determine_qchem_path(version_string=args.version)
             except QChemPathNotDeterminedError as e:
-                raise SystemExit("Invalid Q-Chem version string passed via --version")
+                raise SystemExit("Invalid Q-Chem version string passed via --version: " + args.version)
+        else:
+            try:
+                self.__qchem_args.qchem_executable = determine_qchem_path()
+            except QChemPathNotDeterminedError as e:
+                raise SystemExit("Could not determine Q-Chem version to use.")
 
         # split .in extension from filename
         filename, extension =  os.path.splitext(self.__qchem_args.infile)
@@ -409,7 +414,6 @@ class v40(jsb.jobscript_builder):
 
         if self.__qchem_args.save_flag and self.__qchem_args.savedir is None:
             raise jsb.DataNotReady("If save_flag is set, we need a savedir as well")
-
 
         self.add_payload_hook(jsb.copy_in_hook(self.__files_copy_in),-1000)
         self.add_payload_hook(v40_qchem_payload(self.__qchem_args))

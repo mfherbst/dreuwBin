@@ -48,13 +48,6 @@ except ParseConfigError as pe:
 
 jsb.examine_args(args)
 
-if jsb.qchem_args.qchem_executable is None:
-    # no executable determined so far ==> ask user
-    try:
-        jsb.qchem_args.qchem_executable = determine_qchem_path()
-    except QChemPathNotDeterminedError as e:
-        raise SystemExit("Could not determine Q-Chem version to use.")
-
 # write script
 scriptname=args.infile +  ".sh"
 if jsb.queuing_system_data.job_name is not None:
