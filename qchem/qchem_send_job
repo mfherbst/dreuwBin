@@ -27,7 +27,7 @@ from qchem.qchem_script_builder import QChemPathNotDeterminedError, determine_qc
 
 # setup parser:
 parser = argparse.ArgumentParser(description='Script to send qchem jobs')
-parser.add_argument("--cfg", default=None,type=str,help="Use this alternatve config file as sendscript config")
+parser.add_argument("--cfg", metavar="configfile", default=None,type=str,help="Use this alternatve config file as sendscript config")
 parser.add_argument("--send",default=False, action='store_true', help="Send the job once the jobscript has been written.")
 
 # setup script builder:
