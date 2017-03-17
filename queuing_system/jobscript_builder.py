@@ -45,7 +45,10 @@ def builder_main(script_builder, qsys):
     """
 
     # setup parser:
-    parser = argparse.ArgumentParser(description='Script to send '+script_builder.program_name+' jobs')
+    parser = argparse.ArgumentParser(
+            description='Script to send '+script_builder.program_name+' jobs',
+            formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--cfg", metavar="configfile", default=None,type=str,help="Use this alternatve config file as sendscript config")
     parser.add_argument("--send",default=False, action='store_true', help="Send the job once the jobscript has been written.")
     parser.add_argument("--dumpcfg", default=False, action='store_true', 

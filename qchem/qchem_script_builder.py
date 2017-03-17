@@ -207,7 +207,7 @@ class v40(jsb.jobscript_builder):
 
         # Copy fchk file:
         ret.append(self.__qchem_args.infile + ".fchk")
-        
+
         # TODO possible other ideas:
         # plot.attach.alpha
         # plot.detach.alpha
@@ -242,36 +242,18 @@ class v40(jsb.jobscript_builder):
         Update the inner data using the infile provided. If the values conflict, the
         values are left unchanged.
         """
-        from argparse import ArgumentParser
         data = self.queuing_system_data
 
+        # Qsys lines for later parsing:
+        qsyslines=[]
 
         section=None # the section we are currently in
         with open(infile,'r') as f:
             for line in f:
                 line = line.strip()
 
-                if line.startswith("!QSYS wt="):
-                    if data.walltime is None:
-                        try:
-                            data.walltime = utils.interpret_string_as_time_interval(line[9:].strip())
-                        except ArgumentParser:
-                            pass
-                        continue
-                    else:
-                        print("Warning: Ignoring walltime specified in input file via \"!QSYS wt=\", since walltime already given on commandline.")
-
-                if line.startswith("!QSYS np="):
-                    if data.no_nodes() == 0:
-                        try:
-                            node = qd.node_type()
-                            node.no_procs = utils.interpret_string_as_time_interval(line[9:].strip())
-                            data.add_node_type(node)
-                        except ArgumentParser:
-                            pass
-                        continue
-                    else:
-                        print("Warning: Ignoring number of processes specified in input file via \"!QSYS np=\", since already specified on commandline.")
+                if line.startswith("!QSYS"):
+                    qsyslines.append(line[5:])
 
                 # NOTE:
                 # From here on everything is normalised to lower case!
@@ -336,6 +318,10 @@ class v40(jsb.jobscript_builder):
                         continue
                 # end if
             # end for
+
+        # Parse qsys lines
+        for line in qsyslines:
+            qd.qsys_line(line).parse_into(data)
 
     def examine_args(self,args):
         """
