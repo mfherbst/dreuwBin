@@ -2,7 +2,7 @@
 # vi: set et ts=4 sw=4 sts=4:
 
 # Script to provide user interface for qchem jobscript generation
-# Copyright (C) 2015 Michael F. Herbst
+# Copyright (C) 2017 Michael F. Herbst, Manuel Hodecker, Marvin Hoffmann
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,48 +17,11 @@
 # A copy of the GNU General Public License can be found in the 
 # file LICENCE or at <http://www.gnu.org/licenses/>.
 
-import argparse
+from qchem.qchem_script_builder import v40 as qchem_script_builder
+from queuing_system.jobscript_builder import builder_main
 from queuing_system.pbs import pbs
-from queuing_system.jobscript_builder import jobscript_builder, hook_base, DataNotReady, ParseConfigError
-from qchem.qchem_script_builder import v40 as qchem_builder
-from qchem.qchem_script_builder import QChemPathNotDeterminedError, determine_qchem_path
 
-#-----------------------------------------------------------------
-
-# setup parser:
-parser = argparse.ArgumentParser(description='Script to send qchem jobs')
-parser.add_argument("--cfg", metavar="configfile", default=None,type=str,help="Use this alternatve config file as sendscript config")
-parser.add_argument("--send",default=False, action='store_true', help="Send the job once the jobscript has been written.")
-
-# setup script builder:
+# This is a jobscript builder to send Q-Chem jobs
+# using the PBS queuing system
 qsys=pbs()
-jsb=qchem_builder(qsys)
-jsb.add_entries_to_argparse(parser)
-
-# parse args and config:
-args = parser.parse_args()
-
-try:
-    if args.cfg is not None:
-        jsb.parse_config(cfg=args.cfg,autocreate=False)
-    else:
-        jsb.parse_config()
-except ParseConfigError as pe:
-    raise SystemExit("When parsing the config: " + pe.args[0])
-
-jsb.examine_args(args)
-
-# write script
-scriptname=args.infile +  ".sh"
-if jsb.queuing_system_data.job_name is not None:
-    scriptname=jsb.queuing_system_data.job_name + ".sh"
-
-try:
-    with open(scriptname,"w") as f:
-        f.write(jsb.build_script())
-except DataNotReady as dnr:
-    raise SystemExit("Missing data: " + dnr.args[0])
-
-
-if args.send:
-    qsys.submit_script(scriptname)
+builder_main(qchem_script_builder(qsys), qsys)

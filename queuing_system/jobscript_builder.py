@@ -1,7 +1,7 @@
 # vi: set et ts=4 sw=4 sts=4:
 
 # Python module to help with the generation of queuing job scripts
-# Copyright (C) 2015 Michael F. Herbst
+# Copyright (C) 2015-17 Michael F. Herbst
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,6 +26,60 @@ import queue
 import argparse
 import shared_utils_lib as utils
 import objectmerge
+
+######################################################################
+#--  Main function of build scripts  --#
+########################################
+
+def builder_main(script_builder, qsys):
+    """
+    A generic main function which can be used to setup an actual script building
+    the jobscripts.
+
+    Just specify the script_builder, which should be derived off the
+    jobscript_builder in this class and the queuing_system object
+    to optionally submit the job later on.
+
+    This is the function orca_send_job and qchem_send_job use to do
+    their work.
+    """
+
+    # setup parser:
+    parser = argparse.ArgumentParser(description='Script to send '+script_builder.program_name+' jobs')
+    parser.add_argument("--cfg", metavar="configfile", default=None,type=str,help="Use this alternatve config file as sendscript config")
+    parser.add_argument("--send",default=False, action='store_true', help="Send the job once the jobscript has been written.")
+    parser.add_argument("--dumpcfg", default=False, action='store_true', 
+            help="Dump a default config file under the path specified by --cfg if this file does not exist.")
+
+    # setup script builder:
+    script_builder.add_entries_to_argparse(parser)
+
+    # parse args and config:
+    args = parser.parse_args()
+
+    try:
+        if args.cfg is not None:
+            script_builder.parse_config(cfg=args.cfg,autocreate=args.dumpcfg)
+        else:
+            script_builder.parse_config()
+    except ParseConfigError as pe:
+        raise SystemExit("When parsing the config: " + pe.args[0])
+
+    script_builder.examine_args(args)
+
+    # write script
+    scriptname=args.infile +  ".sh"
+    if script_builder.queuing_system_data.job_name is not None:
+        scriptname=script_builder.queuing_system_data.job_name + ".sh"
+
+    try:
+        with open(scriptname,"w") as f:
+            f.write(script_builder.build_script())
+    except DataNotReady as dnr:
+        raise SystemExit("Missing data: " + dnr.args[0])
+
+    if args.send:
+        qsys.submit_script(scriptname)
 
 ######################################################################
 #--  Helpful hooks  --#
