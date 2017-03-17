@@ -252,22 +252,26 @@ class pbs(queuing_system_base):
         if data.virtual_memory is not None:
             ret += ("#PBS -l vmem=" + str(data.virtual_memory) + "b\n")
 
-        # when to send emails
-        if data.send_email_on.error is not None \
-                or data.send_email_on.begin is not None \
-                or data.send_email_on.end is not None:
-            ret += "#PBS -m "
-            if data.send_email_on.error:
-                ret += "a"
-            if data.send_email_on.begin:
-                ret += "b"
-            if data.send_email_on.end:
-                ret += "e"
-            ret += "\n"
-
-        # whom to send emails
+        # when and whom to send emails
         if data.email is not None:
+            # we have an email address, hence send mail
+            # in cases where this is requested
             ret += ("#PBS -M " + data.email + "\n")
+
+            if data.send_email_on.error is not None \
+                    or data.send_email_on.begin is not None \
+                    or data.send_email_on.end is not None:
+                ret += "#PBS -m "
+                if data.send_email_on.error:
+                    ret += "a"
+                if data.send_email_on.begin:
+                    ret += "b"
+                if data.send_email_on.end:
+                    ret += "e"
+                ret += "\n"
+        else:
+            # no email set, supress sending any email
+            ret += "#PBS -m n\n"
 
         # priority of  job
         if data.priority is not None:
