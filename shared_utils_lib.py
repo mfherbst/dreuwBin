@@ -24,15 +24,11 @@ def interpret_string_as_bool(string):
     if this is not possible, throw an argparse.ArgumentTypeError
     """
     s = string.lower()
-    if s == "true": 
+    if s in [ "true", "1", "yes", "y", "on" ]:
         return True
-    if s == "1":
-        return True
-    if s == "false":
+    if s in [ "false", "0", "no", "n" ,"off" ]:
         return False
-    if s == "0":
-        return False
-    raise argparse.ArgumentTypeError(string + "is not a valid boolean value, expected: true|false|0|1")
+    raise argparse.ArgumentTypeError(string + "is not a valid boolean value, expected: true|false|0|1|yes|y|no|n|on|off")
 
 def interpret_string_as_file_size(string):
     import argparse
@@ -152,16 +148,22 @@ def interpret_string_as_time_interval(string):
             return n
 
 def determine_most_recent_version(basedir):
+    from os import listdir
+    from os.path import isdir
+    from distutils.version import StrictVersion
     """
     Parse the list of directories contained in basedir and
     determine the directory whose name describes the most
     recent version
     """
     # The list of all versions:
-    versionlist=[ d for d in os.listdir(basedir) 
+    versionlist=[ d for d in listdir(basedir)
                     if StrictVersion.version_re.match(d)
-                        and os.path.isdir(d)
+                        and isdir(basedir + "/"+d)
                 ]
+
+    if len(versionlist) == 0:
+        raise ValueError("No version directories found in basedir " + basedir)
 
     # return the most recent:
     return sorted(versionlist, key=StrictVersion)[-1]
