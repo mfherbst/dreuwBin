@@ -35,6 +35,7 @@ def interpret_string_as_bool(string):
     raise argparse.ArgumentTypeError(string + "is not a valid boolean value, expected: true|false|0|1")
 
 def interpret_string_as_file_size(string):
+    import argparse
     import re
     """
     interpret a string of the form 
@@ -44,10 +45,10 @@ def interpret_string_as_file_size(string):
     where suffix is case insensitive and one of
 
     b               bytes
-    kib, kb         Kilo (1024) bytes
-    mib, mb         Mega (1,048,576) bytes
-    gib, gb         Giga (1,073,741,824) bytes
-    tib, tb         Tera (1024)^4 bytes
+    kib, kb, k      Kilo (1024) bytes
+    mib, mb, m      Mega (1,048,576) bytes
+    gib, gb, g      Giga (1,073,741,824) bytes
+    tib, tb, t      Tera (1024)^4 bytes
 
     and return number of bytes
     """
@@ -55,34 +56,36 @@ def interpret_string_as_file_size(string):
         raise TypeError("Cannot parse type " + type(string))
 
     # extract integer:
-    match = re.match("^[0-9]*",string)
+    match = re.match("^[0-9.]*",string)
     if len(match.group()) < 1:
         raise argparse.ArgumentTypeError(string + " is not a valid size value: Expected integer before size suffix")
 
-    nbytes = int(match.group())
+    nbytes = float(match.group())
 
     # now find multiplication factor
-    unit = string[match.end():]
+    unit = string[match.end():].lower()
     if len(unit) == 0:
-        return nbytes
+        return int(nbytes)
 
     unit = unit.lower()
 
     if unit == "b":
-        return nbytes
-    elif unit == "kb" or unit == "kib":
-        return nbytes*1024
-    elif unit == "mb" or unit == "mib":
-        return nbytes*1024*1024
-    elif unit == "gb" or unit == "gib":
-        return nbytes*1024*1024*1024
-    elif unit == "tb" or unit == "tib":
-        return nbytes*1024*1024*1024*1024
+        nbytes = nbytes
+    elif unit in [ "kb", "kib", "k" ]:
+        nbytes = nbytes*1024
+    elif unit in [ "mb", "mib", "m" ]:
+        nbytes = nbytes*1024*1024
+    elif unit in [ "gb", "gib", "g" ]:
+        nbytes = nbytes*1024*1024*1024
+    elif unit in [ "tb", "tib", "t" ]:
+        nbytes = nbytes*1024*1024*1024*1024
     else:
-        raise argparse.ArgumentTypeError(string + " is not a valid size value: Expected one of b,kb,kib, ... tb, tib as size suffix")
+        raise argparse.ArgumentTypeError("\"" +string + "\" is not a valid size value: Expected one of b,kb,kib, ... tb, tib as size suffix")
+    return int(nbytes)
 
 
 def interpret_string_as_time_interval(string):
+    import argparse
     import re
     """
     interpret a string of the form 
