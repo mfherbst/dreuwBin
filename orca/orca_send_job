@@ -1,7 +1,8 @@
-#!/bin/bash
-#
-# sets the PATH variable properly to make all scripts accessible.
-# Copyright (C) 2015-17 Michael F. Herbst
+#!/usr/bin/env python3
+# vi: set et ts=4 sw=4 sts=4:
+
+# Script to provide user interface for qchem jobscript generation
+# Copyright (C) 2017 Michael F. Herbst, Manuel Hodecker, Marvin Hoffmann
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,15 +17,12 @@
 # A copy of the GNU General Public License can be found in the 
 # file LICENCE or at <http://www.gnu.org/licenses/>.
 
-#DIR where this file is saved:
-_dreuwBin_DIR=`dirname ${BASH_SOURCE[0]}`
+from orca.orca_script_builder import orca_script_builder
+from queuing_system.jobscript_builder import builder_main
+from queuing_system.pbs import pbs
 
-for extra in . queuing_system qchem orca; do
-	export PATH="$PATH:$_dreuwBin_DIR/$extra"
-done
+# This is a jobscript builder to send ORCA jobs
+# using the PBS queuing system
+qsys=pbs()
+builder_main(orca_script_builder(qsys), qsys)
 
-for extra in .; do
-	export PYTHONPATH="$PYTHONPATH:$_dreuwBin_DIR/$extra"
-done
-
-unset _dreuwBin_DIR
