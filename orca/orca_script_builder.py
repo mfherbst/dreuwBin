@@ -20,10 +20,7 @@ from queuing_system import jobscript_builder as jsb
 from queuing_system import queuing_system_data as qd
 from queuing_system import queuing_system_environment as qe
 import os.path
-from distutils.version import StrictVersion
-import subprocess
 import shared_utils_lib as utils
-import sys
 
 #########################################################
 #-- Settings --#
@@ -133,6 +130,25 @@ class orca_script_builder(jsb.jobscript_builder):
         argparse.add_argument("infile",metavar="infile.inp", type=str, help="The path to the ORCA input file")
         argparse.add_argument("--out",metavar="file",default=None,type=str, help="ORCA output filename (Default: infile + \".out\")")
         argparse.add_argument("--version", default=None, type=str, help="Version string identifying the ORCA version to be used.")
+
+        epilog="The script tries to complete parameters and information which are not \n" \
+                + "explicitly provided on the commandline using the infile.in input \n" \
+                + "file. This includes: \n" \
+                + "   - jobname (Name of the file), \n" \
+                + "   - output file name, \n" \
+                + "   - number of processors (using %pal and alike) \n" \
+                + "   - physical and virtual memory (using %maxcore and alike) \n" \
+                + "\nFurthermore QSYS directives are available in the orca input file\n" \
+                + "to further set the following properties:\n"
+
+        for k in qd.qsys_line.available_directives:
+            epilog += "   !QSYS " + k + "= <value>     set " \
+                    + qd.qsys_line.available_directives[k] + " to <value>\n"
+
+        if argparse.epilog is None:
+            argparse.epilog = epilog
+        else:
+            argparse.epilog += ("\n" + epilog)
 
     def _orca_work_files(self):
         """

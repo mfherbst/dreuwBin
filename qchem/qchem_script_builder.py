@@ -182,9 +182,19 @@ class v40(jsb.jobscript_builder):
         argparse.add_argument("--version", default=None, type=str, help="Version string identifying the Q-Chem version to be used.")
         argparse.add_argument("--perf", default=False, action='store_true',help="Use time or perf to montitor the memory/cpu usage of Q-Chem.")
 
-        epilog="The script tries to complete parameters and information which are not explicitly provided on the commandline using the infile.in input file. This includes: " \
-                + "jobname (Name of the file), output file name, walltime (via \"!QSYS wt=\" directive), number of processors (using threads directive or \"!QSYS np=\", " \
-                + "physical and virtual memory (using memstatic and memtotal)"
+        epilog="The script tries to complete parameters and information which are not \n" \
+                + "explicitly provided on the commandline using the infile.in input \n" \
+                + "file. This includes: \n" \
+                + "   - jobname (Name of the file), \n" \
+                + "   - output file name, \n" \
+                + "   - number of processors (using threads) \n" \
+                + "   - physical and virtual memory (using memstatic and memtotal)\n" \
+                + "\nFurthermore QSYS directives are available in the orca input file\n" \
+                + "to further set the following properties:\n"
+
+        for k in qd.qsys_line.available_directives:
+            epilog += "   !QSYS " + k + "= <value>     set " \
+                    + qd.qsys_line.available_directives[k] + " to <value>\n"
 
         if argparse.epilog is None:
             argparse.epilog = epilog
