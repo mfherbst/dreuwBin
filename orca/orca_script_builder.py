@@ -180,12 +180,144 @@ class orca_script_builder(jsb.jobscript_builder):
         # TODO Think about more files to copy back!
         return ret
 
+    def __remove_comments(self,line):
+        """
+        Remove comments from an orca input line
+        """
+        # The tricky part is that in ORCA input
+        # the "#" starts and ends comments
+        #
+        # This function hence splits at each #
+        # and ignores every second splitted part.
+
+        sp = line.split("#")
+        ret=""
+        for i in range(0,len(sp),2):
+            ret += sp[i]
+        return ret
+
+    def __parse_simple_line(self,line,extracted):
+        """
+        Parse a simple input line in orca input
+        and place the determined values into the
+        extracted array.
+        """
+        # This is a simple input line
+        # => read word by word:
+        for word in line.lower().split():
+            if word[:3] == "pal":
+                try:
+                    extracted["n_cpus"] = int(word[3:])
+                except ValueError:
+                    continue
+
+    def __parse_inputfile_line(self,line,extracted):
+        """
+        Parse a line of the input file which is supposed to load
+        a molecule from an external file
+        """
+        # TODO
+        # * xyzfile n m filename
+        # * gzmtfile n m filename
+        pass
+
+    def __parse_section(self,section, section_body, extracted):
+        """
+        Parse an orca input section named section with the body section_body
+        """
+        pass #TODO
+        # %pal nprocs 4 end
+
     def _parse_infile(self,infile):
         """
         Update the inner data using the infile provided. If the values conflict, the
         values are left unchanged.
         """
-        pass
+        data = self.queuing_system_data
+
+        # Dict to contain the extracted data
+        extracted = {
+            # Orca specifies the memory per CPU:
+            "mem_per_cpu": None,  # in MB
+            "n_cpus": None,       # Number of CPUs
+            "copy_files": [], # All files to copy to cluster (input geometry)
+        }
+
+        with open(infile,'r') as f:
+            # Other lines we parse later
+            otherlines=""
+
+            # Qsys lines for later parsing:
+            qsyslines=[]
+
+            for line in f:
+                if line.startswith("#QSYS"):
+                    qsyslines.append(line[5:].strip())
+
+                # Remove comments:
+                line=self.__remove_comments(line)
+
+                # If simple input line:
+                if len(line) == 0:
+                    continue
+                elif line[0] == '!':
+                    self.__parse_simple_line(line[1:],extracted)
+                elif line[0] == '*':
+                    self.__parse_inputfile_line(line[1:],extracted)
+                elif line[:8] == "%maxcore":
+                    try:
+                        val = line[8:].split()[0]
+                    except ValueError:
+                        otherlines += line[8:]
+                        continue
+                    extracted["mem_per_core"] = max(extracted["mem_per_core"],val)
+                elif line[:9] == "% maxcore":
+                    print("Warning: Unknown keyword \"% maxcore\" is a close match "+
+                            "to \"%maxcore\", but is ignored.")
+                else:
+                    otherlines+=(line + '\n')
+
+            section_name=None
+            for word in otherlines:
+                if word[0] == "%":
+                    section_name=word[1:]
+                    section_body=""
+                elif section_name == "":
+                    section_name=word
+                elif word == "end":
+                    self.__parse_section(section_name,section_body,extracted)
+                    section_name=None
+                elif section_name:
+                    section += (" " + word)
+            #end for
+        #end with
+
+        # Commit what we found:
+        self.__files_copy_in.extend(extracted["copy_files"])
+
+        if extracted["n_cpus"] is not None:
+            if data.no_procs() < extracted["n_cpus"]:
+                # we have less processors than requested
+                node = qd.node_type()
+                node.no_procs = extracted["n_cpus"] - data.no_procs()
+                data.add_node_type(node)
+
+        if extracted["mem_per_cpu"] is not None:
+            mem = extracted["mem_per_cpu"]
+            if extracted["n_cpus"] is not None:
+                mem *= extracted["n_cpus"]
+
+            # Add a safety offset:
+            mem += 50 # MB
+
+            if data.physical_memory is None:
+                data.physical_memory = mem*1024*1024 #value is in MB
+            if data.virtual_memory is None:
+                data.virtual_memory = mem*1024*1024 #value is in MB
+
+        # Parse qsys lines:
+        for line in qsyslines:
+            qd.qsys_line(line).parse_into(data)
 
     def examine_args(self,args):
         """
