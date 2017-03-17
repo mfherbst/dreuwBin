@@ -152,9 +152,11 @@ class v40(jsb.jobscript_builder):
     def __init__(self,qsys):
         super().__init__(qsys)
         self.__files_copy_in=None  # files that should be copied into the workdir
-        self.__files_copy_out=None  # files that should be copied out of the workdir on successful execution
+        self.__files_copy_work_out=None  # files that should be copied out of the workdir on successful execution
+        self.__files_copy_scratch_out=None  # files that should be copied out of the scratchdir on successful execution
         self.__files_copy_error_out=None # files that should be copied out of the workdir on 
         self.__qchem_args=None
+        self.program_name = "Q-Chem"
 
     @property
     def qchem_args(self):
