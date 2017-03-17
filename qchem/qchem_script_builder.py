@@ -322,6 +322,11 @@ class v40(jsb.jobscript_builder):
                         except ValueError:
                             continue
 
+                        # Q-Chem does not honour the mem_total value properly
+                        # so therefore we add a fixed offset to the value in
+                        # the input file
+                        no += 50 # Add 50mb
+
                         if data.physical_memory is None:
                             data.physical_memory = no*1024*1024 #value is in MB
                         if data.virtual_memory is None:
