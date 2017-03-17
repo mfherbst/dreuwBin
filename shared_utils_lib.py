@@ -1,7 +1,7 @@
 # vi: set et ts=4 sw=4 sts=4:
 
 # Python module of some helpful utils
-# Copyright (C) 2015 Michael F. Herbst
+# Copyright (C) 2015-17 Michael F. Herbst
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -150,3 +150,18 @@ def interpret_string_as_time_interval(string):
             if len(li) > 3:
                 n += 24*60*60*int(li[-4])
             return n
+
+def determine_most_recent_version(basedir):
+    """
+    Parse the list of directories contained in basedir and
+    determine the directory whose name describes the most
+    recent version
+    """
+    # The list of all versions:
+    versionlist=[ d for d in os.listdir(basedir) 
+                    if StrictVersion.version_re.match(d)
+                        and os.path.isdir(d)
+                ]
+
+    # return the most recent:
+    return sorted(versionlist, key=StrictVersion)[-1]
