@@ -25,7 +25,7 @@ def which(exectuable,path=os.environ["PATH"]):
 
     Return the path if found, else None
     """
-    for p in path:
+    for p in path.split(":"):
         full = p + os.path.sep + exectuable
         if os.path.exists(full) and os.access(full,os.X_OK):
             return full

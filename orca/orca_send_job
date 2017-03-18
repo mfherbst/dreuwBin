@@ -34,9 +34,10 @@ orca_basedir = "/opt/software/Orca"
 # Map orca version to the mpi module
 # which needs to be loaded for orca to run
 orca_to_openmpi_map = {
-    #"4.0.0" : "openmpi/gcc/2.0.2", #TODO Check when there
-    "4.0.0" : "openmpi/gcc/1.8.2", #TODO Check when there
+    "4.0.0" : "openmpi/gcc/2.0.2",
     "3.0.3" : "openmpi/gcc/1.8.2",
+    "3.0.1" : "openmpi/gcc/1.8.2",
+    "3.0.0" : "openmpi/gcc/1.8.2",
 }
 
 #########################################################
@@ -171,7 +172,7 @@ class orca_script_builder(jsb.jobscript_builder):
         # Add output file
         if self.__orca_args.outfile is not None:
             ret.append(self.__orca_args.outfile)
-        
+
         # Copy gbw and property files
         # Note: Orca does not always split the extension, so we
         # will attempt to copy both versions
@@ -181,6 +182,7 @@ class orca_script_builder(jsb.jobscript_builder):
         ])
 
         # TODO Think about more files to copy back!
+        #      for example: Plots
         return ret
 
     def __remove_comments(self,line):
@@ -219,17 +221,48 @@ class orca_script_builder(jsb.jobscript_builder):
         Parse a line of the input file which is supposed to load
         a molecule from an external file
         """
-        # TODO
-        # * xyzfile n m filename
-        # * gzmtfile n m filename
-        pass
+        # Split the line, but take care that strings will not be split.
+        #
+        # Phase1:   Split at " such that each even element of the list
+        #           used to be a quoted string and hence should not be split.
+        phase1=[ s for s in line.split("\"") if len(s) > 0 ]
 
-    def __parse_section(self,section, section_body, extracted):
+        def split_even(i,l):
+            if i%2==0:
+                return l.split()
+            else:
+                return [l]
+
+        # Split the parts into words
+        # ... but only the even elements of the listof the odd elements:
+        words=[ a for i in range(len(phase1))
+                for a in split_even(i,phase1[i]) ]
+
+        if len(words) == 0:
+            return
+
+        if words[0] in [ "xyzfile", "gzmtfile" ] and len(words) == 4:
+            # The syntax is
+            # * xyzfile n m filename
+            # * gzmtfile n m filename
+            extracted["copy_files"].append(words[3])
+
+    def __parse_section(self,name, section_body, extracted):
         """
         Parse an orca input section named section with the body section_body
         """
-        pass #TODO
-        # %pal nprocs 4 end
+        if (name == "pal"):
+            # Split section text at whitespace into words:
+            words = section_body.split()
+
+            for i in range(len(words)):
+                if words[i] == "nprocs":
+                    try:
+                        extracted["n_cpus"] = int(words[i+1])
+                    except ValueError:
+                        continue
+                # end if
+            # end for
 
     def _parse_infile(self,infile):
         """
@@ -281,17 +314,18 @@ class orca_script_builder(jsb.jobscript_builder):
                     otherlines+=(line + '\n')
 
             section_name=None
-            for word in otherlines:
+            for word in otherlines.split():
                 if word[0] == "%":
                     section_name=word[1:]
                     section_body=""
                 elif section_name == "":
                     section_name=word
                 elif word == "end":
-                    self.__parse_section(section_name,section_body,extracted)
+                    self.__parse_section(section_name,section_body.strip(),extracted)
                     section_name=None
+                    section_body=None
                 elif section_name:
-                    section += (" " + word)
+                    section_body += (" " + word)
             #end for
         #end with
 
