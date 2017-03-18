@@ -20,6 +20,7 @@
 from queuing_system import jobscript_builder as jsb
 from queuing_system import queuing_system_data as qd
 from queuing_system import queuing_system_environment as qe
+from queuing_system.qsys_line import qsys_line
 from queuing_system.guess_queuing_system import guess_queuing_system
 import os.path
 import subprocess
@@ -194,9 +195,9 @@ class qchem_script_builder(jsb.jobscript_builder):
                 + "\nFurthermore QSYS directives are available in the orca input file\n" \
                 + "to further set the following properties:\n"
 
-        for k in qd.qsys_line.available_directives:
+        for k in qsys_line.available_directives:
             epilog += "   !QSYS " + k + "= <value>     set " \
-                    + qd.qsys_line.available_directives[k] + " to <value>\n"
+                    + qsys_line.available_directives[k] + " to <value>\n"
 
         if argparse.epilog is None:
             argparse.epilog = epilog
@@ -333,7 +334,7 @@ class qchem_script_builder(jsb.jobscript_builder):
 
         # Parse qsys lines
         for line in qsyslines:
-            qd.qsys_line(line).parse_into(data)
+            qsys_line(line).parse_into(data)
 
     def examine_args(self,args):
         """
