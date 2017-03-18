@@ -171,6 +171,9 @@ class pbs(queuing_system_base):
     #    pbs_resources_linux
     #    qsub
 
+    def name(self):
+        return "PBS"
+
     def parse_commandline_args(self,cmdline):
         """
         Parse a commandline string and return a queuing_system_data object

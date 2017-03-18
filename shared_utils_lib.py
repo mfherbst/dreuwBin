@@ -16,6 +16,20 @@
 # A copy of the GNU General Public License can be found in the 
 # file LICENCE or at <http://www.gnu.org/licenses/>.
 
+import os
+import os.path
+
+def which(exectuable,path=os.environ["PATH"]):
+    """Perform a lookup like the which function and return the
+    full path to the executable
+
+    Return the path if found, else None
+    """
+    for p in path:
+        full = p + os.path.sep + exectuable
+        if os.path.exists(full) and os.access(full,os.X_OK):
+            return full
+    return None
 
 def interpret_string_as_bool(string):
     import argparse
@@ -148,8 +162,6 @@ def interpret_string_as_time_interval(string):
             return n
 
 def determine_most_recent_version(basedir):
-    from os import listdir
-    from os.path import isdir
     from distutils.version import StrictVersion
     """
     Parse the list of directories contained in basedir and
@@ -157,13 +169,13 @@ def determine_most_recent_version(basedir):
     recent version
     """
     # The list of all versions:
-    versionlist=[ d for d in listdir(basedir)
+    versionlist=[ d for d in os.listdir(basedir)
                     if StrictVersion.version_re.match(d)
-                        and isdir(basedir + "/"+d)
+                        and os.path.isdir(basedir + os.path.sep +d)
                 ]
 
     if len(versionlist) == 0:
-        raise ValueError("No version directories found in basedir " + basedir)
+        return None
 
     # return the most recent:
     return sorted(versionlist, key=StrictVersion)[-1]

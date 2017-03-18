@@ -30,6 +30,13 @@ class UnknownDataFieldException(Exception):
 
 class queuing_system_base(metaclass=ABCMeta):
     @abstractmethod
+    def name(self):
+        """
+        Return the name of the queing system.
+        """
+        pass
+
+    @abstractmethod
     def parse_commandline_args(self,cmdline):
         """
         Parse a commandline string and return a queuing_system_data object
