@@ -586,6 +586,7 @@ class jobscript_builder:
         #      do this right now, so this is a quick fix for the
         #      warning that there is no node available.
         if data.no_nodes() == 0:
+            print("Warning: Number of processors or nodes to use not specified anywhere. Defaulting to 1 node and 1 processor.")
             node = qd.node_type()
             node.no_procs = 1
             data.add_node_type(node)
