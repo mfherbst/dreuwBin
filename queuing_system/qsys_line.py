@@ -13,9 +13,10 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# A copy of the GNU General Public License can be found in the 
+# A copy of the GNU General Public License can be found in the
 # file LICENCE or at <http://www.gnu.org/licenses/>.
 
+from queuing_system.queuing_system_data import queuing_system_data
 from argparse import ArgumentParser
 import shared_utils_lib as utils
 import re
@@ -24,6 +25,11 @@ class qsys_line:
     """
     Class to parse or build a QSYS line originating
     from an input file of another program
+
+    The #QSYS, !QSYS or whatever prefix should already
+    be stripped by the caller. This function only interprets
+    the plain key-value pairs like
+    "wt=4h  mem=3gb" ...
     """
     def __parse_to_key_value(self,line):
         # Normalise:
@@ -51,6 +57,10 @@ class qsys_line:
 
     def parse_into(self,data):
         """Place the values in this data object"""
+
+        if not isinstance(data,queuing_system_data):
+            raise TypeError("data should be of type queuing_system_data")
+
         for k in self.__vals:
             verror_string = ("Could not parse value \""+self.__vals[k]
                 + "\" of QSYS directive " + k 
@@ -77,6 +87,24 @@ class qsys_line:
                         raise ValueError(verror_string)
                 else:
                     self.__print_ignore(k)
+            elif k == "mem":
+                if data.physical_memory is None:
+                    try:
+                        data.physical_memory = \
+                            utils.interpret_string_as_file_size(self.__vals[k])
+                    except ArgumentParser:
+                        raise ValueError(verror_string)
+                else:
+                    self.__print_ignore(k)
+            elif k == "vmem":
+                if data.virtual_memory is None:
+                    try:
+                        data.virtual_memory = \
+                            utils.interpret_string_as_file_size(self.__vals[k])
+                    except ArgumentParser:
+                        raise ValueError(verror_string)
+                else:
+                    self.__print_ignore(k)
             else:
                 raise ValueError("Unknown QSYS directive: \""+k+"\"")
 
@@ -87,4 +115,6 @@ class qsys_line:
     available_directives = {
             "wt": "job walltime",
             "np": "number of processors",
+            "mem": "physical memory",
+            "vmem": "virtual memory",
             }
