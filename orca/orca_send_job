@@ -38,8 +38,8 @@ orca_basedir = "/opt/software/Orca"
 orca_to_openmpi_map = {
     "4.0.0" : "openmpi/gcc/2.0.2",
     "3.0.3" : "openmpi/intel/1.6.5",
-    "3.0.1" : "openmpi/gcc/1.8.2",
-    "3.0.0" : "openmpi/gcc/1.8.2",
+    "3.0.1" : "openmpi/intel/1.6.5",
+    "3.0.0" : "openmpi/intel/1.6.5",
 }
 
 #########################################################
