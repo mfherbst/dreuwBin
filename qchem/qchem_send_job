@@ -129,8 +129,8 @@ class qchem_payload(jsb.hook_base):
         string += "\n"
 
         string += "# check if job terminated successfully\n" \
-                + 'if ! grep -q "Thank you very much for using Q-Chem.  Have a nice day." "' \
-                + qchem_args.outfile + '"; then\n' \
+                + 'if ! tail -n 30 "' + qchem_args.outfile + '" | grep -q ' \
+                + '"Thank you very much for using Q-Chem.  Have a nice day."; then\n' \
                 + '    ' + calc_env.return_value +'=1\n' \
                 + 'fi\n'
 
