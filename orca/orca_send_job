@@ -306,7 +306,7 @@ class orca_script_builder(jsb.jobscript_builder):
                     except ValueError:
                         otherlines += line[8:]
                         continue
-                    extracted["mem_per_core"] = max(extracted["mem_per_core"],val)
+                    extracted["mem_per_cpu"] = max(extracted["mem_per_cpu"],val)
                 elif line[:9] == "% maxcore":
                     print("Warning: Unknown keyword \"% maxcore\" is a close match "+
                             "to \"%maxcore\", but is ignored.")
