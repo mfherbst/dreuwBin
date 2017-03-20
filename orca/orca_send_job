@@ -33,11 +33,13 @@ orca_basedir = "/opt/software/Orca"
 
 # Map orca version to the mpi module
 # which needs to be loaded for orca to run
+# Parallelized jobs via openmpi only available 
+# using openmpi/intel modules at the moment!
 orca_to_openmpi_map = {
     "4.0.0" : "openmpi/gcc/2.0.2",
-    "3.0.3" : "openmpi/gcc/1.8.2",
-    "3.0.1" : "openmpi/gcc/1.8.2",
-    "3.0.0" : "openmpi/gcc/1.8.2",
+    "3.0.3" : "openmpi/intel/1.6.5",
+    "3.0.1" : "openmpi/intel/1.6.5",
+    "3.0.0" : "openmpi/intel/1.6.5",
 }
 
 #########################################################
@@ -263,6 +265,10 @@ class orca_script_builder(jsb.jobscript_builder):
                         continue
                 # end if
             # end for
+        else:
+            # TODO: check if the section has the maxcore keyword
+            # and alter extracted["mem_per_cpu"] accordingly
+            pass
 
     def _parse_infile(self,infile):
         """
@@ -274,7 +280,7 @@ class orca_script_builder(jsb.jobscript_builder):
         # Dict to contain the extracted data
         extracted = {
             # Orca specifies the memory per CPU:
-            "mem_per_cpu": None,  # in MB
+            "mem_per_cpu": 0,  # in MB
             "n_cpus": None,       # Number of CPUs
             "copy_files": [], # All files to copy to cluster (input geometry)
         }
@@ -302,7 +308,7 @@ class orca_script_builder(jsb.jobscript_builder):
                     self.__parse_inputfile_line(line[1:],extracted)
                 elif line[:8] == "%maxcore":
                     try:
-                        val = line[8:].split()[0]
+                        val = int(line[8:].split()[0])
                     except ValueError:
                         otherlines += line[8:]
                         continue
@@ -339,7 +345,7 @@ class orca_script_builder(jsb.jobscript_builder):
                 node.no_procs = extracted["n_cpus"] - data.no_procs()
                 data.add_node_type(node)
 
-        if extracted["mem_per_cpu"] is not None:
+        if extracted["mem_per_cpu"] > 0:
             mem = extracted["mem_per_cpu"]
             if extracted["n_cpus"] is not None:
                 mem *= extracted["n_cpus"]
