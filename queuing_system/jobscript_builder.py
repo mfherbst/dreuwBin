@@ -483,7 +483,7 @@ class jobscript_builder:
         argparse.add_argument("--np",metavar="#", default=None, type=int, help="Number of processors/threads")
         argparse.add_argument("--name",metavar="jobname", default=None,type=str,help="Name of the Job")
         argparse.add_argument("--priority",metavar="num", default=None,type=int,help="Priority of the Job")
-        argparse.add_argument("--queue",metavar="queue@host", default=None,type=str,help="Select queue to use to run the job")
+        argparse.add_argument("--queue",metavar="queue[@host]", default=None,type=str,help="Select queue to use to run the job")
         argparse.add_argument("--merge_stdout_stderr", metavar="true|false", default=None,type=utils.interpret_string_as_bool,help="Merge stdout and stderr streams")
         argparse.add_argument("--send_email_end", metavar="true|false", default=None,type=utils.interpret_string_as_bool,help="Send an email if the job ends")
         argparse.add_argument("--send_email_begin", metavar="true|false", default=None,type=utils.interpret_string_as_bool,help="Send an email if the job begins")
