@@ -596,17 +596,31 @@ class jobscript_builder:
         if not qsys.is_ready_for_submission(data):
             raise DataNotReady(qsys.why_not_ready_for_submission(data))
 
-        workdir=self.__force_node_workdir
-        if workdir is None:
-            if self.__node_workdir_base is None or data.job_name is None:
-                raise DataNotReady("work_dir not set. Either specify it on the commandline or add a workdir_base in the config file and a job name on the command line.")
-            workdir = self.__node_workdir_base + "/" + data.job_name
+        # Determine the shell string expression for the working directory
+        # and the scratch directory.
+        # The variables workdirexpr and scratchdirexpr do not neccessarily
+        # contain an actual directory. They only need to contain a valid
+        # bash shell expression, which when assigned to a variable yields
+        # a correct directory.
+        if self.__force_node_workdir:
+            workdirexpr='"' + self.__force_node_workdir + '"'
+        elif self.__node_workdir_base and data.job_name:
+            workdirexpr = '"' + self.__node_workdir_base + '/' + data.job_name
+            workdirexpr += '_$' + params.jobid + '"'
+        else:
+            raise DataNotReady("Could not determine working directory.\n"
+                    "Either specify it on the commandline or provide a jobname and "
+                    "add a workdir_base in the config file.")
 
-        scratchdir = self.__force_node_scratchdir
-        if scratchdir is None:
-            if self.__node_scratchdir_base is None or data.job_name is None:
-                raise DataNotReady("scratch_dir not set. Either specify it on the commandline or add a scratchdir_base in the config file and a job name on the command line.")
-            scratchdir = self.__node_scratchdir_base + "/" + data.job_name
+        if self.__force_node_scratchdir:
+            scratchdirexpr = '"' + self.__force_node_scratchdir + '"'
+        elif self.__node_scratchdir_base and data.job_name:
+            scratchdirexpr = '"' + self.__node_scratchdir_base + "/" + data.job_name
+            scratchdirexpr += '_$' + params.jobid + '"'
+        else:
+            raise DataNotReady("Could not determine scratch directory.\n"
+                "Either specify it on the commandline or provide a jobname and "
+                "add a scratchdir_base in the config file.")
 
 
         if self.queuing_system_data.walltime is None:
@@ -628,13 +642,6 @@ class jobscript_builder:
         string += separator
 
         # Copy global vars from python part
-        environ.node_work_dir = "NODE_WORKDIR"
-        environ.node_scratch_dir="NODE_SCRATCHDIR"
-        environ.return_value = "RETURN_VALUE"
-        string += 'NODE_WORKDIR="' + workdir + '"\n'
-        string += 'RETURN_VALUE=0\n' 
-        string += 'NODE_SCRATCHDIR="' + scratchdir + '"\n'
-        string += 'NODES=$' + params.nodes + '\n'
         string += 'SUBMIT_HOST=$' + params.submit_host + '\n'
         string += 'SUBMIT_SERVER=$' + params.submit_server+ '\n'
         string += 'SUBMIT_QUEUE=$' + params.submit_queue+ '\n'
@@ -644,8 +651,16 @@ class jobscript_builder:
         string += 'QUEUE=$' + params.queue+ '\n'
         string += 'O_PATH=$' + params.path+ '\n'
         string += 'O_HOME=$' +params.home+ '\n'
+        string += 'NODES=$' + params.nodes + '\n'
         string += 'NODES_UNIQUE=$(echo "$NODES" | sort -u)\n'
 
+        # Setup return / node / scratch environment:
+        environ.return_value = "RETURN_VALUE"
+        environ.node_work_dir = "NODE_WORKDIR"
+        environ.node_scratch_dir="NODE_SCRATCHDIR"
+        string += 'RETURN_VALUE=0\n'
+        string += 'NODE_WORKDIR=' + workdirexpr + '\n'
+        string += 'NODE_SCRATCHDIR=' + scratchdirexpr + '\n'
 
         string += separator
 
@@ -665,32 +680,16 @@ print_info() {
     echo qsys: current home directory is $O_HOME
     echo qsys: PATH = $O_PATH
     echo ------------------------------------------------------
+    echo
 }
 
 stage_in() {
     rm -f "$SUBMIT_WORKDIR/job_not_successful"
 
-    # create workdir and cd to it.
-
-    if [ -d "$NODE_WORKDIR" ]; then
-        local NEWWORKDIR="${NODE_WORKDIR}_${JOBID}"
-        echo >&2
-        echo "Workdir $NODE_WORKDIR already exists! Proceeding with $NEWWORKDIR." >&2
-        NODE_WORKDIR=$NEWWORKDIR
-    fi
-
-    if [ -d "$NODE_SCRATCHDIR" ]; then
-        local NEWSCRATCHDIR="${NODE_SCRATCHDIR}_${JOBID}"
-        echo >&2
-        echo "Scratchdir $NODE_SCATCHDIR already exists! Proceeding with $NEWSCRATCHDIR." >&2
-        NODE_SCRATCHDIR=$NEWSCRATCHDIR
-    fi
-
-    echo
     echo "Calculation working directory: $NODE_WORKDIR"
-    echo "            scratch directory: $NODE_SCATCHDIR"
+    echo "            scratch directory: $NODE_SCRATCHDIR"
 
-    # create scratch dir and work dir
+    # create workdir and cd to it.
     if ! mkdir -m700 -p $NODE_SCRATCHDIR $NODE_WORKDIR; then
         echo "Could not create scratch($NODE_SCRATCHDIR) or workdir($NODE_WORKDIR)" >&2
         exit 1
