@@ -928,14 +928,14 @@ c_login_node() {
 	Make sure to configure the .ssh/config that a simple ssh node is enough."
 	local NODE="$1"
 	local ID="$2"
-	ssh -t "$NODE" "cd /lscratch/$ID; bash -il"
+	ssh -t "$NODE" "cd /lscratch/; cd $USER; cd *_$ID; bash -il"
 }
 
 c_scratch_node() {
 	help_string "login to the nodes scratch folder /scratch/$USER"
 	local NODE="$1"
 	local ID="$2"
-	ssh -t "$NODE" "cd /scratch/; cd $USER; bash -il"
+	ssh -t "$NODE" "cd /scratch/; cd $USER; cd *_$ID; bash -il"
 }
 
 c_top_node() {
