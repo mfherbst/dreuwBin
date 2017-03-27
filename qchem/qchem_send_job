@@ -384,7 +384,10 @@ class qchem_script_builder(jsb.jobscript_builder):
 
         # set outfile if not provided:
         if args.out is None:
-            self.__qchem_args.outfile= filename + ".out"
+            outext=".out"
+            if extension in [ ".qcin" ]:
+                outext=".qcout"
+            self.__qchem_args.outfile= filename + outext
         else:
             self.__qchem_args.outfile=args.out
 
