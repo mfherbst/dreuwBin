@@ -234,14 +234,14 @@ class DataNotReady(Exception):
     """
     def __init__(self,message):
         super(DataNotReady, self).__init__(message)
-    
+
 
 class calculation_environment:
     def __init__(self):
         self.node_work_dir=None #str; shell variable containing the dir where calculations take place on the server
         self.node_scratch_dir=None #str; shell variable containing the dir where node-local scratch files may be placed
         self.return_value=None #str; shell variable containing the return value
-        
+
 #######################################################################
 #--  Main class  --#
 ####################
@@ -262,7 +262,7 @@ class jobscript_builder:
     j.add_payload_hook(bla)
     j.add_error_hook(bla)
     j.build_script
-    
+
     ...
 
     """
@@ -423,25 +423,25 @@ class jobscript_builder:
 
         if len(k.get_value("queue")) > 0:
             data.queue_name=k.get_value("queue")
-        
+
         if len(k.get_value("merge_stdout_stderr")) > 0:
             try:
                 data.merge_stdout_stderr = utils.interpret_string_as_bool(k.get_value("merge_stdout_stderr"))
             except argparse.ArgumentTypeError:
                 raise ParseConfigError("Cannot interpret config value of merge_stdout_stderr: " + k.get_value("merge_stdout_stderr") + ". Should be true or false")
-        
+
         if len(k.get_value("send_email_end")) > 0:
             try:
                 data.send_email_on.end = utils.interpret_string_as_bool(k.get_value("send_email_end"))
             except argparse.ArgumentTypeError:
                 raise ParseConfigError("Cannot interpret config value of send_email_end: " + k.get_value("send_email_end") + ". Should be true or false")
-        
+
         if len(k.get_value("send_email_begin")) > 0:
             try:
                 data.send_email_on.begin =utils.interpret_string_as_bool(k.get_value("send_email_begin"))
             except argparse.ArgumentTypeError:
                 raise ParseConfigError("Cannot interpret config value of send_email_begin: " + k.get_value("send_email_begin") + ". Should be true or false")
-        
+
         if len(k.get_value("send_email_error")) > 0:
             try:
                 data.send_email_on.error = utils.interpret_string_as_bool(k.get_value("send_email_error"))
@@ -500,7 +500,7 @@ class jobscript_builder:
         provided arguments overwrite everything else on the commandline
         """
         data = self.queuing_system_data
-        
+
         if args.name is not None:
             data.job_name = args.name
 
@@ -524,10 +524,10 @@ class jobscript_builder:
 
         if args.priority is not None:
             data.priority = args.priority
-        
+
         if args.workdir is not None:
             self.__force_node_workdir = args.workdir
-        
+
         if args.scratchdir is not None:
             self.__force_node_scratchdir = args.scratchdir
 
@@ -545,7 +545,7 @@ class jobscript_builder:
 
         if args.send_email_error is not None:
             data.send_email_on.error = args.send_email_error
-        
+
         if args.qsys_args is not None:
             cmd_qd = qsys.parse_commandline_args(args.qsys_args)
             om = objectmerge.objectmerge(data,allowUpdates=True,allowListExtend=False)
@@ -586,7 +586,8 @@ class jobscript_builder:
         #      do this right now, so this is a quick fix for the
         #      warning that there is no node available.
         if data.no_nodes() == 0:
-            print("Warning: Number of processors or nodes to use not specified anywhere. Defaulting to 1 node and 1 processor.")
+            print("Warning: Number of processors or nodes to use not specified anywhere. "
+                    "Defaulting to 1 node and 1 processor.")
             node = qd.node_type()
             node.no_procs = 1
             data.add_node_type(node)
@@ -617,7 +618,7 @@ class jobscript_builder:
 
         # build shebang:
         string="#!/bin/bash\n#\n"
-        
+
         # build header
         string += qsys.build_script_header(data)
         string += "\n"
@@ -706,9 +707,9 @@ stage_out() {
         touch "$SUBMIT_WORKDIR/job_not_successful"
     fi
 
-    echo 
+    echo
     echo ------------------------------------------------------
-    echo 
+    echo
 
     echo "Final files in $SUBMIT_WORKDIR:"
     (
@@ -721,7 +722,7 @@ stage_out() {
     echo "$NODES_UNIQUE" | sed 's/^/    /g'
     echo
     echo "Sizes of these files:"
-    
+
     if echo "$NODE_SCRATCHDIR"/* | grep -q "$NODE_SCRATCHDIR/\*$"; then
         # no files in scratchdir:
         du -shc * | sed 's/^/    /g'
@@ -731,12 +732,16 @@ stage_out() {
 
     echo
     echo "If you want to delete these, run:"
-    for node in $NODES_UNIQUE; do 
+    for node in $NODES_UNIQUE; do
         echo "    ssh $node rm -r \\"$NODE_WORKDIR\\" \\"$NODE_SCRATCHDIR\\""
     done
 }
 
 handle_error() {
+    # Make sure this function is only called once
+    # and not once for each parallel process
+    trap ':' 2 9 15
+
     echo
     echo "#######################################"
     echo "#-- Early termination signal caught --#"
@@ -749,7 +754,7 @@ handle_error() {
 """
         # add stuff from hooks:
         string+="payload_hooks() {\n:\n"
-    
+
         while not self.__payload_hooks.empty():
             hook = self.__payload_hooks.get() [1]
             string += hook.generate(data,params,environ)
@@ -757,7 +762,7 @@ handle_error() {
         string += "}\n\n"
 
         string+="error_hooks() {\n:\n"
-        
+
         while not self.__error_hooks.empty():
             hook = self.__error_hooks.get() [1]
             string += hook.generate(data,params,environ)
@@ -776,7 +781,7 @@ stage_in
 trap 'handle_error' 2 9 15
 
 payload_hooks
-stage_out 
+stage_out
 exit $RETURN_VALUE\
 
 """
