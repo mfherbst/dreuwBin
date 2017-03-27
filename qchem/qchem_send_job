@@ -192,7 +192,7 @@ class qchem_script_builder(jsb.jobscript_builder):
                 + "   - output file name, \n" \
                 + "   - number of processors (using threads) \n" \
                 + "   - physical and virtual memory (using memstatic and memtotal)\n" \
-                + "\nFurthermore QSYS directives are available in the orca input file\n" \
+                + "\nFurthermore QSYS directives are available in the Q-Chem input file\n" \
                 + "to further set the following properties:\n"
 
         for k in qsys_line.available_directives:
