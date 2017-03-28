@@ -44,8 +44,8 @@ done
   required queuing system parameters for the job.
 - An appropriate job script is produced, but may be reviewed by the user
   before sending it off to the job queue.
-- The way the queuing system parameters is very flexible and may be influenced
-  in many ways by the user. Options include:
+- The way the queuing system parameters are determined is very flexible and may be
+  influenced by the user in the follwing ways:
   - Commandline flags
   - Native parameters in the calculation program's input file
     (e.g. ``threads`` or ``memtotal`` for Q-Chem or ``%pal`` sections for ORCA)
