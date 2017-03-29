@@ -12,19 +12,14 @@ I will assume for this ``README.md``, that this is exactly what you have
 done and give the instructions accordingly.
 
 ## Setup
-- The recommended way to setup is using the setup script ``setPATH.sh``.
+- The recommended way to setup is using the **setup script** ``setPATH.sh``.
 In order to do so, you should add the following line at the end of your
 ``$HOME/.bashrc``:
 ```
 source $HOME/dreuwBin/setPATH.sh
 ```
-
-- Alternatively: If you just want to use some of the scripts in this 
-repository the simplest option is most probably to just link to them
-directly from your ``~/bin``, e.g. for the script ``quotaUsage.sh``:
-```
-ln  -s $HOME/dreuwBin/quotaUsage.sh $HOME/bin/
-```
+Of course you can alternatively just copy or link individual files
+to your ``$HOME/bin`` folder or similar instead.
 
 - If you want to use **Tab completion** you should furthermore 
 create the file ``$HOME/.bash_completion``, if it does not exist,
@@ -41,7 +36,7 @@ done
 ### ``qchem_send_job`` and ``orca_send_job``
 - Facilitate sending jobs to a cluster for performing calculations.
 - The scripts parse the calculation input file and automatically determine the
-  required queuing system parameters for the job.
+  required queuing system parameters for each individual job.
 - An appropriate job script is produced, but may be reviewed by the user
   before sending it off to the job queue.
 - The way the queuing system parameters are determined is very flexible and may be
@@ -62,9 +57,9 @@ done
 - I.e. we login and automatically cd to the same directory as locally.
 
 ## Submitting scripts
-The best way to do this is via **Pull Request** on github.  
-Note that I will only merge the request if your changes satisfy the
-[coding guidelines](CODING_GUIDELINES.md).
+The best way to do this is via **Pull Request** on github.
+Note that the request will only be merged if your changes satisfy the
+[coding guidelines](CodingGuidelines.md).
 
 ## Authors
 - For a list of authors and their contributions see [AUTHORS.md](AUTHORS.md).

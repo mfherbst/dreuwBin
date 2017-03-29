@@ -19,9 +19,9 @@
    should be provided that spits out a (hopefully) complete
    documentation of the available flags and features.
 
-   *NOTE:* Any script taking a single commandline argument or one
+   **NOTE:** Any script taking a single commandline argument or one
    which has more than a few lines of code should be 
-   considered to be "non-obvious".
+   considered to be *non-obvious*.
 
 6. If the script fails it should exit with a return code != 0
    (eg. call ``exit 1``). All error output should be written to 
@@ -31,5 +31,6 @@
    before exiting (regardless if the script execution fails
    or is successful)
 
-8. If in doubt ask the user or abort. Avoid Philippians or 
-   Danielisms. ;)
+8. Employ [defensive programming](https://en.wikipedia.org/wiki/Defensive_programming):
+   Prefer overchecking input and abort the program if your
+   assumptions are not fulfilled.
