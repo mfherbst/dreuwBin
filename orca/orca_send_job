@@ -21,6 +21,7 @@ from queuing_system import jobscript_builder as jsb
 from queuing_system import queuing_system_data as qd
 from queuing_system import queuing_system_environment as qe
 from queuing_system.qsys_line import qsys_line
+from queuing_system.qsys_line import available_directives as qsys_directives
 from queuing_system.guess_queuing_system import guess_queuing_system
 import os.path
 import shared_utils_lib as utils
@@ -147,9 +148,9 @@ class orca_script_builder(jsb.jobscript_builder):
                 + "\nFurthermore QSYS directives are available in the orca input file\n" \
                 + "to further set the following properties:\n"
 
-        for k in qsys_line.available_directives:
+        for k in qsys_directives:
             epilog += "   !QSYS " + k + "= <value>     set " \
-                    + qsys_line.available_directives[k] + " to <value>\n"
+                    + qsys_directives[k] + " to <value>\n"
 
         if argparse.epilog is None:
             argparse.epilog = epilog
@@ -253,7 +254,7 @@ class orca_script_builder(jsb.jobscript_builder):
         """
         Parse an orca input section named section with the body section_body
         """
-        if (name == "pal"):
+        if name == "pal":
             # Split section text at whitespace into words:
             words = section_body.split()
 
@@ -266,9 +267,21 @@ class orca_script_builder(jsb.jobscript_builder):
                 # end if
             # end for
         else:
-            # TODO: check if the section has the maxcore keyword
-            # and alter extracted["mem_per_cpu"] accordingly
-            pass
+            # In a general section we seek for the maxcore
+            # keyword, which has an influence on the memory to use
+            # So we just iterate through all words
+            try:
+                it = iter(section_body.split())
+
+                # Get the word after maxcore and convert to int
+                while next(it) != "maxcore": pass
+                val = int(next(it))
+
+                extracted["mem_per_cpu"] = max(extracted["mem_per_cpu"],val)
+            except ValueError:
+                pass # Conversion string => int fails
+            except StopIteration:
+                pass
 
     def _parse_infile(self,infile):
         """
@@ -286,16 +299,16 @@ class orca_script_builder(jsb.jobscript_builder):
         }
 
         with open(infile,'r') as f:
+            # Deal with QSYS lines
+            qsys_line(data).parse_file(f,comment_chars=['#'])
+
+            # Rewind and deal with the rest of the input file
+            f.seek(0)
+
             # Other lines we parse later
             otherlines=""
 
-            # Qsys lines for later parsing:
-            qsyslines=[]
-
             for line in f:
-                if line.startswith("#QSYS"):
-                    qsyslines.append(line[5:].strip())
-
                 # Remove comments:
                 line=self.__remove_comments(line)
 
@@ -344,23 +357,31 @@ class orca_script_builder(jsb.jobscript_builder):
                 node = qd.node_type()
                 node.no_procs = extracted["n_cpus"] - data.no_procs()
                 data.add_node_type(node)
+            else:
+                print("Warning: Ignoring number of threads (== " + str(extracted["n_cpus"]) + 
+                        ") specified via '!PAL', '%pal' or similar in ORCA input file,"
+                        " since the number of nodes is already provided by a QSYS "
+                        "directive or on the commandline.")
 
         if extracted["mem_per_cpu"] > 0:
             mem = extracted["mem_per_cpu"]
-            if extracted["n_cpus"] is not None:
-                mem *= extracted["n_cpus"]
-
-            # Add a safety offset:
-            mem += 50 # MB
-
             if data.physical_memory is None:
-                data.physical_memory = mem*1024*1024 #value is in MB
-            if data.virtual_memory is None:
-                data.virtual_memory = mem*1024*1024 #value is in MB
+                if extracted["n_cpus"] is not None:
+                    mem *= extracted["n_cpus"]
 
-        # Parse qsys lines:
-        for line in qsyslines:
-            qsys_line(line).parse_into(data)
+                # Add a safety offset:
+                mem += 50 # MB
+
+                data.physical_memory = mem*1024*1024 #value is in MB
+            else:
+                print("Warning: Ignoring memory specified in ORCA input file via '%maxcore' or 'maxcore' "
+                        "(== " + str(mem) + "), since the physical memory is already provided"
+                        " by a QSYS directive or on the commandline.")
+
+        # Copy physical memory value to virtual memory value
+        # if vmem is not set:
+        if data.virtual_memory is None and not data.physical_memory is None:
+            data.virtual_memory = data.physical_memory
 
     def examine_args(self,args):
         """

@@ -21,6 +21,7 @@ from queuing_system import jobscript_builder as jsb
 from queuing_system import queuing_system_data as qd
 from queuing_system import queuing_system_environment as qe
 from queuing_system.qsys_line import qsys_line
+from queuing_system.qsys_line import available_directives as qsys_directives
 from queuing_system.guess_queuing_system import guess_queuing_system
 import os.path
 import subprocess
@@ -195,9 +196,9 @@ class qchem_script_builder(jsb.jobscript_builder):
                 + "\nFurthermore QSYS directives are available in the Q-Chem input file\n" \
                 + "to further set the following properties:\n"
 
-        for k in qsys_line.available_directives:
+        for k in qsys_directives:
             epilog += "   !QSYS " + k + "= <value>     set " \
-                    + qsys_line.available_directives[k] + " to <value>\n"
+                    + qsys_directives[k] + " to <value>\n"
 
         if argparse.epilog is None:
             argparse.epilog = epilog
@@ -257,39 +258,30 @@ class qchem_script_builder(jsb.jobscript_builder):
         """
         data = self.queuing_system_data
 
-        # Qsys lines for later parsing:
-        qsyslines=[]
-
         section=None # the section we are currently in
         with open(infile,'r') as f:
+            # Deal with QSYS lines
+            qsys_line(data).parse_file(f,comment_chars=['!'])
+
+            # Rewind and deal with the rest of the input file
+            f.seek(0)
             for line in f:
-                line = line.strip()
-
-                if line.startswith("!QSYS"):
-                    qsyslines.append(line[5:])
-
-                # NOTE:
-                # From here on everything is normalised to lower case!
-                line = line.lower()
+                # Normalise:
+                line = line.strip().lower()
 
                 if line.startswith("$end"):
                     section=None
-                    continue
 
-                if section is None:
+                elif section is None:
                     if line.startswith("$molecule"):
                         section="molecule"
-                        continue
-
-                    if line.startswith("$rem"):
+                    elif line.startswith("$rem"):
                         section="rem"
-                        continue
 
                 elif section == "molecule":
                     if line.startswith("read"):
                         line = line[4:].strip()
                         self.__files_copy_in.append(line)
-                    continue
 
                 elif section == "rem":
                     if line.startswith("threads"):
@@ -306,10 +298,13 @@ class qchem_script_builder(jsb.jobscript_builder):
                             node = qd.node_type()
                             node.no_procs = no - data.no_procs()
                             data.add_node_type(node)
+                        else:
+                            print("Warning: Ignoring number of threads specified via "
+                                    "'threads' in Q-Chem input file,"
+                                    " since the number of nodes is already provided by"
+                                    " a QSYS directive or on the commandline.")
 
-                        continue
-
-                    if line.startswith("mem_total"):
+                    elif line.startswith("mem_total"):
                         # memory in mb
                         line = line[9:].strip()
 
@@ -319,22 +314,25 @@ class qchem_script_builder(jsb.jobscript_builder):
                         except ValueError:
                             continue
 
-                        # Q-Chem does not honour the mem_total value properly
-                        # so therefore we add a fixed offset to the value in
-                        # the input file
-                        no += 50 # Add 50mb
-
                         if data.physical_memory is None:
+                            # Q-Chem does not honour the mem_total value properly
+                            # so therefore we add a fixed offset to the value in
+                            # the input file
+                            no += 50 # Add 50mb
+
                             data.physical_memory = no*1024*1024 #value is in MB
-                        if data.virtual_memory is None:
-                            data.virtual_memory = no*1024*1024 #value is in MB
-                        continue
+                        else:
+                            print("Warning: Ignoring physical memory specified via "
+                                    "'mem_total' in Q-Chem input file,"
+                                    " since this is already provided by"
+                                    " a QSYS directive or on the commandline.")
                 # end if
             # end for
 
-        # Parse qsys lines
-        for line in qsyslines:
-            qsys_line(line).parse_into(data)
+        # Copy physical memory value to virtual memory value
+        # if vmem is not set:
+        if data.virtual_memory is None and not data.physical_memory is None:
+            data.virtual_memory = data.physical_memory
 
     def examine_args(self,args):
         """
