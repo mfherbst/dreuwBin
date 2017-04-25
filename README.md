@@ -56,6 +56,10 @@ done
 - Login to a different host, but preserving the working directory
 - I.e. we login and automatically cd to the same directory as locally.
 
+### ``look4bas``
+- Lookup and download Gaussian basissets
+- See [github.com/mfherbst/look4bas](https://github.com/mfherbst/look4bas) for detauls.
+
 ## Submitting scripts
 The best way to do this is via **Pull Request** on github.
 Note that the request will only be merged if your changes satisfy the
