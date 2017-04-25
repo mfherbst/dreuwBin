@@ -19,7 +19,7 @@
 #DIR where this file is saved:
 _dreuwBin_DIR=`dirname ${BASH_SOURCE[0]}`
 
-for extra in . queuing_system qchem orca; do
+for extra in . queuing_system qchem orca external/look4bas; do
 	export PATH="$PATH:$_dreuwBin_DIR/$extra"
 done
 

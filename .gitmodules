@@ -1,0 +1,3 @@
+[submodule "external/look4bas"]
+	path = external/look4bas
+	url = https://github.com/mfherbst/look4bas.git
