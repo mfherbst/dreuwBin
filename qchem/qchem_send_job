@@ -269,6 +269,10 @@ class qchem_script_builder(jsb.jobscript_builder):
                 # Normalise:
                 line = line.strip().lower()
 
+                if line.find("=") != -1:
+                    sp = line.split("=",maxsplit=1)
+                    line = sp[0]+"".join(sp[1:])
+
                 if line.startswith("$end"):
                     section=None
 
