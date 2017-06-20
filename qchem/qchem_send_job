@@ -320,9 +320,10 @@ class qchem_script_builder(jsb.jobscript_builder):
 
                         if data.physical_memory is None:
                             # Q-Chem does not honour the mem_total value properly
-                            # so therefore we add a fixed offset to the value in
+                            # so therefore we add an offset to the value in
                             # the input file
-                            no += 50 # Add 50mb
+                            off = max(50, int(0.05*no)) # Add 1%, at least 50mb
+                            no += off
 
                             data.physical_memory = no*1024*1024 #value is in MB
                         else:
