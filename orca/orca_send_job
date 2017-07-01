@@ -188,7 +188,8 @@ class orca_script_builder(jsb.jobscript_builder):
         #      for example: Plots
         return ret
 
-    def __remove_comments(self,line):
+
+    def __remove_comments(self, line):
         """
         Remove comments from an orca input line
         """
@@ -204,7 +205,8 @@ class orca_script_builder(jsb.jobscript_builder):
             ret += sp[i]
         return ret
 
-    def __parse_simple_line(self,line,extracted):
+
+    def __parse_simple_line(self, line, extracted):
         """
         Parse a simple input line in orca input
         and place the determined values into the
@@ -219,7 +221,8 @@ class orca_script_builder(jsb.jobscript_builder):
                 except ValueError:
                     continue
 
-    def __parse_inputfile_line(self,line,extracted):
+
+    def __parse_inputfile_line(self, line, extracted):
         """
         Parse a line of the input file which is supposed to load
         a molecule from an external file
@@ -250,7 +253,29 @@ class orca_script_builder(jsb.jobscript_builder):
             # * gzmtfile n m filename
             extracted["copy_files"].append(words[3])
 
-    def __parse_section(self,name, section_body, extracted):
+
+    def __remove_structure_block(self, lines):
+        # Keywords which indicate a structure block
+        # with geometry and molecular structure information
+        structure_keywords = [ "xyz", "int", "gzmt" ]
+
+        ret = []
+        add = True
+        for line in lines:
+            if not add and line[0] == "*":
+                add = True # End of the block
+            elif add and line[0] == "*" and \
+                    line[1:].split()[0] in structure_keywords:
+                        # The line begins with * and
+                        # has one of the keywords as the first
+                        # word thereafter
+                        add = False
+            elif add:
+                ret.append(line)
+        return ret
+
+
+    def __parse_section(self, name, section_body, extracted):
         """
         Parse an orca input section named section with the body section_body
         """
@@ -283,6 +308,71 @@ class orca_script_builder(jsb.jobscript_builder):
             except StopIteration:
                 pass
 
+
+    def __parse_sections(self, lines, extracted):
+        # List of keywords, which increase the section_depth,
+        # i.e. the number of 'end' we need to get out of the current
+        # section in the input file block. These are those keywords
+        # inside sections like "%basis" or "%coords" that need an
+        # end once they are done.
+        subsection_keywords=[ "newgto", "coords", "pardef", ]
+
+        # Split up into sections and parse those with subparsers
+        section_name=None  # Name of the current section
+        ignored_words=[]   # List of words we ignored since section_name was
+                           # None when we encountered them
+        for word in " ".join(lines).split():
+            # Section start
+            if word[0] == "%":
+                section_name=word[1:]
+                section_body=""     # Accumulated body of the section
+                section_depth=1     # Number of ends we need to get out
+                                    # of this very section
+                continue
+            elif section_name is None:
+                ignored_words.append(word)
+                continue
+
+            # Section end
+            elif word == "end" and section_depth == 1:
+                assert section_body is not None, \
+                        "section_body should not be None. Are all relevant " \
+                        "keywords added to the subsection_keywords list."
+                assert section_name is not None, \
+                        "section_name should not be None. Are all relevant " \
+                        "keywords added to the subsection_keywords list."
+                self.__parse_section(section_name, section_body.strip(), extracted)
+
+                # Reset all caches and continue
+                section_name=None
+                section_body=None
+                section_depth=None
+                continue
+
+            # Subsection start and end
+            elif word == "end" and section_depth > 1:
+                section_depth -= 1
+            elif word in subsection_keywords:
+                section_depth += 1
+
+            # Add word to section body
+            section_body += (" " + word)
+        #end for
+
+        # Print a warning if we ignored some words
+        if ignored_words:
+            print("WARNING: The following words were ignored when parsing the input file.")
+            print("         If you believe some of them contain important information, ")
+            print("         than probably something went wrong during the parsing of the")
+            print("         input file in the '_parse_infile' function. Maybe you just need")
+            print("         to add a keyword to the 'subsection_keywords' list.")
+            print()
+            print("The following was ignored:")
+            print(ignored_words)
+            print()
+            print("Please consider opening an issue or pull request on github.")
+
+
     def _parse_infile(self,infile):
         """
         Update the inner data using the infile provided. If the values conflict, the
@@ -305,50 +395,44 @@ class orca_script_builder(jsb.jobscript_builder):
             # Rewind and deal with the rest of the input file
             f.seek(0)
 
-            # Other lines we parse later
-            otherlines=""
+            # Lines we cache for later parsing:
+            otherlines=[]
 
             for line in f:
                 # Remove comments:
                 line=self.__remove_comments(line)
+                line=line.strip()
 
-                # If simple input line:
-                if len(line) == 0:
+                if len(line) == 0: # Ignore empty
                     continue
-                elif line[0] == '!':
-                    self.__parse_simple_line(line[1:],extracted)
-                elif line[0] == '*':
-                    self.__parse_inputfile_line(line[1:],extracted)
-                elif line[:8] == "%maxcore":
+                elif line[0] == '!': # Parse simple input
+                    self.__parse_simple_line(line[1:], extracted)
+                elif line[0] == '*': # Parse structure file input
+                    self.__parse_inputfile_line(line[1:], extracted)
+                    # Keep this line for the next parsing step below
+                    otherlines.append(line)
+                elif line[:8] == "%maxcore": # Parse maxcore
                     try:
                         val = int(line[8:].split()[0])
                     except ValueError:
-                        otherlines += line[8:]
+                        otherlines.append(line)
                         continue
-                    extracted["mem_per_cpu"] = max(extracted["mem_per_cpu"],val)
+                    extracted["mem_per_cpu"] = max(extracted["mem_per_cpu"], val)
                 elif line[:9] == "% maxcore":
                     print("Warning: Unknown keyword \"% maxcore\" is a close match "+
                             "to \"%maxcore\", but is ignored.")
-                else:
-                    otherlines+=(line + '\n')
+                else: # Other stuff is to be parsed later
+                    otherlines.append(line)
 
-            section_name=None
-            for word in otherlines.split():
-                if word[0] == "%":
-                    section_name=word[1:]
-                    section_body=""
-                elif section_name == "":
-                    section_name=word
-                elif word == "end":
-                    self.__parse_section(section_name,section_body.strip(),extracted)
-                    section_name=None
-                    section_body=None
-                elif section_name:
-                    section_body += (" " + word)
-            #end for
+            # Remove those lines which are a block of input coords, i.e.
+            # *xyz ... * or *int ... * and so on
+            otherlines = self.__remove_structure_block(otherlines)
+
+            # Parse the sections which are left and deal with them
+            self.__parse_sections(otherlines, extracted)
         #end with
 
-        # Commit what we found:
+        # Deal with what we found during the parsing above
         self.__files_copy_in.extend(extracted["copy_files"])
 
         if extracted["n_cpus"] is not None:
@@ -382,6 +466,7 @@ class orca_script_builder(jsb.jobscript_builder):
         # if vmem is not set:
         if data.virtual_memory is None and not data.physical_memory is None:
             data.virtual_memory = data.physical_memory
+
 
     def examine_args(self,args):
         """
@@ -445,7 +530,7 @@ class orca_script_builder(jsb.jobscript_builder):
         self.__files_copy_in =[]
         self.__files_copy_in.append(self.__orca_args.infile)
 
-        # parse infile 
+        # parse infile
         self._parse_infile(self.__orca_args.infile)
 
         # File to copy out from working directory of node
