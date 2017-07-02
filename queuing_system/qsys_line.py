@@ -151,3 +151,17 @@ available_directives = {
         "mem": "physical memory",
         "vmem": "virtual memory",
         }
+
+def print_available_directives(indention=4*" ", comment_chars=["#"], keywords=["QSYS"]):
+    maxdir = max( len(k) for k in available_directives )
+    maxlal = max( len(available_directives[k]) for k in available_directives )
+
+    fmt = indention + "{0:4s} {1:<" + str(maxdir) + "s} = <value>     {2:" + \
+            str(maxlal)+"s}\n"
+
+    ret=""
+    for k in available_directives:
+        for c in comment_chars:
+            for kw in keywords:
+                ret += fmt.format(c + kw, k, available_directives[k])
+    return ret

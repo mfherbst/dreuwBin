@@ -21,7 +21,7 @@ from queuing_system import jobscript_builder as jsb
 from queuing_system import queuing_system_data as qd
 from queuing_system import queuing_system_environment as qe
 from queuing_system.qsys_line import qsys_line
-from queuing_system.qsys_line import available_directives as qsys_directives
+from queuing_system.qsys_line import print_available_directives
 from queuing_system.guess_queuing_system import guess_queuing_system
 import os.path
 import shared_utils_lib as utils
@@ -146,11 +146,8 @@ class orca_script_builder(jsb.jobscript_builder):
                 + "   - number of processors (using %pal and alike) \n" \
                 + "   - physical and virtual memory (using %maxcore and alike) \n" \
                 + "\nFurthermore QSYS directives are available in the orca input file\n" \
-                + "to further set the following properties:\n"
-
-        for k in qsys_directives:
-            epilog += "   !QSYS " + k + "= <value>     set " \
-                    + qsys_directives[k] + " to <value>\n"
+                + "to further set the following properties:\n" \
+                + print_available_directives(comment_chars=["#"])
 
         if argparse.epilog is None:
             argparse.epilog = epilog
