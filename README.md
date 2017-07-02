@@ -49,6 +49,16 @@ done
     program eventually executed.
   - A global configuration file with defaults for walltime, ...
 
+### ``send_command``
+- Send a command or a script to a cluster
+- Optionally supply further files to copy to the cluster in order to perform the job.
+- For example
+```
+send_command --copy blubba "cat blubba"
+```
+  would first copy the file `blubba` to the compute cluster and then execute `cat blubba`,
+  i.e. the job's output file would contain the content of `blubba`.
+
 ### ``qinvestigate``
 - Interactive PBS queuing system analysis and diagnosis toolkit.
 

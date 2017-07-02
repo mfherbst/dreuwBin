@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+# vi: set et ts=4 sw=4 sts=4:
+
+# Script to submit general purpose PBS jobs
+# Copyright (C) 2015 Michael F. Herbst
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# A copy of the GNU General Public License can be found in the
+# file LICENCE or at <http://www.gnu.org/licenses/>.
+
+from queuing_system import jobscript_builder as jsb
+from queuing_system import queuing_system_data as qd
+from queuing_system import queuing_system_environment as qe
+from queuing_system.qsys_line import qsys_line
+from queuing_system.qsys_line import print_available_directives
+from queuing_system.guess_queuing_system import guess_queuing_system
+import os
+
+#########################################################
+#--  CLI  --#
+#############
+
+class cli_payload(jsb.hook_base):
+    def __init__(self, commandline, prepend_workdir=False):
+        self.__commandline = commandline
+
+    def generate(self,data,params,calc_env):
+        """
+        Generate shell script code from the queuing_system_data,
+        the queuing_system_params and the calculation_environment
+        provided
+        """
+        if not isinstance(data,qd.queuing_system_data):
+            raise TypeError("data not of type qd.queuing_system_data")
+
+        if not isinstance(params,qe.queuing_system_environment):
+            raise TypeError("params not of type qe.queuing_system_environment")
+
+        if not isinstance(calc_env,jsb.calculation_environment):
+            raise TypeError("calc_env not of type calculation_environment")
+
+        # Append current working directory to PATH
+        ret  ='export PATH="$PATH:."\n'
+        ret += "\n"
+        ret += self.__commandline + "\n"
+        ret += calc_env.return_value + '=$?\n'
+        return ret
+
+
+class cli_script_builder(jsb.jobscript_builder):
+    """
+    Class to build a job script to run a script or commandline as a payload
+    """
+
+    def __init__(self,qsys):
+        super().__init__(qsys)
+        self.__files_copy_in=None  # files that should be copied into the workdir
+        self.__files_copy_out=None  # files that should be copied out of the workdir
+        self.program_name = "commandline"
+        self.__commandline = None
+
+
+    def add_entries_to_argparse(self,argparse):
+        """
+        Adds required entries to an argparse Object supplied
+        """
+        super().add_entries_to_argparse(argparse)
+
+        argparse.add_argument("command", metavar="COMMAND", type=str,
+                help="The command or script file to execute on the cluster.")
+        argparse.add_argument("--copy", metavar="file", type=str, nargs="+",
+                help="The files to copy to the compute node before the script or command "
+                     "is executed.")
+
+        epilog="The script will try to read the COMMAND in case it is an existing\n" \
+                + "file in order to automatically complete neccessary information.\n" \
+                + "This includes the QSYS directives: \n" \
+                + print_available_directives(comment_chars=["#"])
+
+        if argparse.epilog is None:
+            argparse.epilog = epilog
+        else:
+            argparse.epilog += ("\n" + epilog)
+
+
+    def _parse_scriptfile(self, scriptfile):
+        data = self.queuing_system_data
+
+        with open(scriptfile, 'r') as f:
+            # Deal with QSYS lines
+            qsys_line(data).parse_file(f, comment_chars=['#'])
+
+            # TODO at some point ...
+            # Rewind and deal with the rest of the input file
+            # f.seek(0)
+
+        # Copy physical memory value to virtual memory value
+        # if vmem is not set:
+        if data.virtual_memory is None and not data.physical_memory is None:
+            data.virtual_memory = data.physical_memory
+
+
+    def examine_args(self, args):
+        """
+        Update the inner data using the argparse data
+        i.e. if there are conflicting values, the commandline takes
+        preference
+
+        If we find a flag to parse extra commandline args (-q, --qsys-args)
+        invoke parsing of those arguments as well. Note that these explicitly
+        provided arguments overwrite everything else on the commandline
+        """
+        super().examine_args(args)
+
+        self.__commandline    = args.command
+        self.__files_copy_in  = args.copy if args.copy else []
+        self.__files_copy_out = []
+
+        jobname = args.command.split()
+        if len(jobname) == 0:
+            jobname = None
+        else:
+            jobname = jobname[0]
+
+        for fle in self.__files_copy_in:
+            if not os.path.exists(fle):
+                raise SystemExit("The file " + fle + " could not be found.")
+
+        if os.path.exists(args.command) and os.path.isfile(args.command):
+            self.__files_copy_in.append(args.command)
+            self._parse_scriptfile(args.command)
+
+        # TODO Add files to copy out
+
+        # set jobname if not yet set:
+        if self.queuing_system_data.job_name is None and jobname is not None:
+            self.queuing_system_data.job_name = jobname
+
+
+    def build_script(self):
+        if self.__commandline is None:
+            raise jsb.DataNotReady("No commandline to execute found")
+
+        if self.__files_copy_in:
+            self.add_payload_hook(jsb.copy_in_hook(self.__files_copy_in),-1000)
+
+        self.add_payload_hook(cli_payload(self.__commandline))
+
+        if self.__files_copy_out:
+            out_file_hook = jsb.copy_out_hook(self.__files_copy_out, fromdir="WORK")
+            self.add_payload_hook(out_file_hook, 900)
+            self.add_error_hook(jsb.copy_out_hook(self.__files_copy_out),-1000)
+
+        return super().build_script()
+
+
+#########################################################
+#-- main --#
+############
+
+def main():
+    # Guess the queuing system and start the buider
+    qsys=guess_queuing_system()
+    jsb.builder_main(cli_script_builder(qsys),qsys)
+
+if __name__ == "__main__":
+    main()
