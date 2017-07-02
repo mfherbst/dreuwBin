@@ -71,7 +71,7 @@ def builder_main(script_builder, qsys):
     script_builder.examine_args(args)
 
     # write script
-    scriptname=args.infile +  ".sh"
+    scriptname="jobscript.sh"
     if script_builder.queuing_system_data.job_name is not None:
         scriptname=script_builder.queuing_system_data.job_name + ".sh"
 
