@@ -219,6 +219,9 @@ class qchem_script_builder(jsb.jobscript_builder):
         # Copy fchk file:
         ret.append(self.__qchem_args.infile + ".fchk")
 
+        # Copy plots (newer qchem versions)
+        ret.append("plots")
+
         # TODO possible other ideas:
         # plot.attach.alpha
         # plot.detach.alpha
@@ -242,7 +245,7 @@ class qchem_script_builder(jsb.jobscript_builder):
         """
         ret=[]
 
-        # Copy plots:
+        # Copy plots (older qchem versions)
         if self.__qchem_args.savedir:
             ret.append(self.__qchem_args.savedir + "/plots")
 
@@ -399,7 +402,7 @@ class qchem_script_builder(jsb.jobscript_builder):
         self.__files_copy_in =[]
         self.__files_copy_in.append(self.__qchem_args.infile)
 
-        # parse infile 
+        # parse infile
         self._parse_infile(self.__qchem_args.infile)
 
         # File to copy out from working directory of node
