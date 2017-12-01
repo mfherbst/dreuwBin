@@ -176,7 +176,10 @@ class orca_script_builder(jsb.jobscript_builder):
         # Copy gbw and property files
         # Note: Orca does not always split the extension, so we
         # will attempt to copy both versions
-        postfixes = [ ".prop", ".gbw", "_property.txt" ]
+        postfixes = [
+            ".prop", ".gbw", "_property.txt",
+            ".engrad", ".opt", ".xyz", ".trj",
+        ]
         ret.extend([
             p+e for p in prefixes for e in postfixes
         ])
