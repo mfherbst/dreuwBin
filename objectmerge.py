@@ -86,12 +86,18 @@ class objectmerge:
             if sender_vars[var] is None:
                 continue
 
-            if allowListExtend is True:
+            if self.__allowListExtend is True:
                 # see if rec_vars[var] has the extend method:
                 extend_op = getattr(rec_vars[var], "extend", None)
                 if callable(extend_op):
                     extend_op(sender_vars[var])
                     continue
+
+            if hasattr(rec_vars[var], "__dict__"):
+                om = objectmerge(rec_vars[var], allowUpdates=self.__allowUpdates,
+                                 allowListExtend=self.__allowListExtend)
+                om.merge_in(sender_vars[var])
+                continue
 
             # just set the value:
             rec_vars[var] = sender_vars[var]
@@ -106,11 +112,11 @@ class objectmerge:
             return "Types of receiver and sender do not match"
 
         # if updates are allowed frome here on we are ok
-        if self.allowUpdates:
+        if self.__allowUpdates:
             return None
 
         sender_vars = vars(sender)
-        rec_vars = vars(self.receiver)
+        rec_vars = vars(self.__receiver)
 
         for var in rec_vars:
             if rec_vars[var] is None or sender_vars[var] is None:
