@@ -547,7 +547,13 @@ class jobscript_builder:
             data.send_email_on.error = args.send_email_error
 
         if args.qsys_args is not None:
-            cmd_qd = qsys.parse_commandline_args(args.qsys_args)
+            qsys = self.__qsys
+            try:
+                cmd_qd = qsys.parse_commandline_args(args.qsys_args)
+            except ValueError as e:
+                raise SystemExit("The explicitly provided --qsys-args are erroneous: " +
+                                 str(e))
+
             om = objectmerge.objectmerge(data,allowUpdates=True,allowListExtend=False)
             try:
                 om.merge_in(cmd_qd)

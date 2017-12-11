@@ -21,6 +21,7 @@ from queuing_system import queuing_system_data as qd
 from queuing_system import queuing_system_environment as qe
 import platform
 import re
+import argparse
 
 class pbs_time:
     def __init__(self,time):
@@ -85,7 +86,7 @@ class pbs_size:
         wordsize is either none or the number of bits in a word.
         (even though only multiples of 8 will be accepted)
         """
-        
+
         # set wordsize (or autodetermine from os)
         self.wordsize = wordsize
 
@@ -174,12 +175,62 @@ class pbs(queuing_system_base):
     def name(self):
         return "PBS"
 
-    def parse_commandline_args(self,cmdline):
+
+    def __parse_lstring_into(self, lstring, data):
+        """Parse a single string following an -l and set the
+           appropriate values in the data object.
+        """
+
+        if "," in lstring:
+            for lstr in lstring.split(","):
+                self.__parse_lstring_into(lstring, data)
+
+        # Get key and value
+        if "=" not in lstring:
+            key = lstring
+            value = ""
+        else:
+            key, value = lstring.split("=", maxsplit=1)
+
+        if key in ["walltime", "mem", "vmem", "nodes"] and not value:
+            raise ValueError("The PBS resources walltime, mem, vmem, nodes need an "
+                             "argument following them after an '='.")
+
+        if key == "walltime":
+            data.walltime = pbs_time(value).seconds
+        elif key == "mem":
+            data.physical_memory = pbs_size(value).bytes
+        elif key == "vmem":
+            data.virtual_memory = pbs_size(value).bytes
+        elif key == "nodes":
+            raise NotImplementedError("Parsing nodes on the commandline not "
+                                      "yet implemented.")
+        else:
+            data.extra_resources[key] = value
+
+    def parse_commandline_args(self, cmdline):
         """
         Parse a commandline string and return a queuing_system_data object
 
         No check towards consistency like is_ready_for_submission is made
         """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-l", default=[], action="append")
+
+        args, rest = parser.parse_known_args(cmdline.split())
+
+        if len(rest) > 0:
+            raise NotImplementedError("TODO: Not yet implemented parsing these "
+                                      "arguments: " + " ".join(rest))
+        data = qd.queuing_system_data()
+
+        # Deal with -l flag:
+        if args.l:
+            for lstring in args.l:
+                self.__parse_lstring_into(lstring, data)
+        return data
+
+
         #TODO
         # use pbs_size and pbs_time above
         # throw UnknownDataFieldException
@@ -193,7 +244,7 @@ class pbs(queuing_system_base):
         """
         if not isinstance(data,qd.queuing_system_data):
             raise TypeError("data is not of type queuing_system_data")
-    
+
         ret = self.why_not_ready_for_submission(data)
         if ret != "":
             raise ValueError("data is not ready for submission: " + ret)
@@ -254,6 +305,14 @@ class pbs(queuing_system_base):
         # amount of virtual memory (including swap)
         if data.virtual_memory is not None:
             ret += ("#PBS -l vmem=" + str(data.virtual_memory) + "b\n")
+
+        # Extra resources (as key-value pairs)
+        for k, v in data.extra_resources.items():
+            if len(v) > 0:
+                val = "=" + str(v)
+            else:
+                val = ""
+            ret += ("#PBS -l " + k + val + "\n")
 
         # when and whom to send emails
         if data.email is not None:

@@ -109,6 +109,7 @@ class queuing_system_data:
         self.email=None #str: user email address for mail
         self.send_email_on=send_email_on()
         self.priority=None #int: between -1024 and +1023
+        self.extra_resources={}  # Extra resources as a dict name: value
 
     def no_procs(self):
         """Return the total number of processors on all nodes"""
