@@ -68,14 +68,16 @@ EOF
 
 ask_for_default_parameters() {
 	while true; do
-		read -e  -p "Enter directory where all your qchem scripts are located: " -i "$VERSION_DIR" VERSION_DIR >&2
-		
+		read -e  -p "Enter directory where all your qchem scripts are located: " \
+			-i "$VERSION_DIR" VERSION_DIR >&2
+
 		if [ ! -d "$VERSION_DIR" ]; then
 			echo "--> Directory not found" >&2
 			continue
 		fi
 
-		if [ "$(find  "$VERSION_DIR" -maxdepth 1 -type f -executable | wc -l)" -lt 1 ]; then
+		EXECUTABLES=$(find  "$VERSION_DIR" -maxdepth 1 -type f -executable)
+		if [ "$(echo "$EXECUTABLES" | wc -l)" -lt 1 ]; then
 			echo "--> Did not find any executalbe file in $VERSION_DIR" >&2
 			continue
 		fi
@@ -88,11 +90,11 @@ default_config() {
 	# spits out the default configuration
 
 	cat <<- EOF
-	# The systax of all options is 
+	# The systax of all options is
 	# <OPTIONNAME> = "<OPTIONVALUE>"
 	# Both spaces around the = as well as the " around the
-	# <OPTIONVALUE> are optional. 
-	# 
+	# <OPTIONVALUE> are optional.
+	#
 	# <OPTIONVALUE> may not continue any of the three characters
 	#  " = '
 
@@ -172,7 +174,7 @@ ask_user_for_version() {
 
 	echo >&2
 	echo "Note, that you can skip this question next time by setting" >&2
-       	echo "QCHEM_FORCE_VERSION to the value you just chose." >&2
+	echo "QCHEM_FORCE_VERSION to the value you just chose." >&2
 }
 
 store_recent_version() {
