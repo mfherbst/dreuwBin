@@ -473,7 +473,10 @@ class jobscript_builder:
         Adds required entries to an argparse Object supplied
         """
 
-        argparse.add_argument("--qsys-args", "-q", metavar="args", default=None, type=str,help="Extra options for the queuing system (e.g. \"-l mem=40 -l vmem=20\" or \"-l intel\")." )
+        argparse.add_argument("--qsys-args", "-q", metavar="args", default=None,
+                type=str,help="Extra options for the queuing system "
+                "(e.g. \"-l mem=40 -l vmem=20\" or \"-l intel\")."
+        )
         argparse.add_argument("--workdir", "-d", metavar="dir", default=None, type=str, help="Change job execution directory on the node")
         argparse.add_argument("--scratchdir", metavar="dir", default=None, type=str, help="Change the path of the node-local scratch directory")
         argparse.add_argument("--mail", "-m", metavar="user@host", default=None, type=str, help="EMail Address to which messages are sent")
@@ -482,12 +485,23 @@ class jobscript_builder:
         argparse.add_argument("--vmem",metavar="size", default=None, type=utils.interpret_string_as_file_size, help="Virtual memory in the format integer[suffix] (Default: What was set for --mem)")
         argparse.add_argument("--np",metavar="#", default=None, type=int, help="Number of processors/threads")
         argparse.add_argument("--name",metavar="jobname", default=None,type=str,help="Name of the Job")
-        argparse.add_argument("--priority",metavar="num", default=None,type=int,help="Priority of the Job")
+        argparse.add_argument("--priority", "-p", metavar="num", default=None,
+                type=int,
+                help="Priority of the Job. Larger values imply a higher priority. "
+                "Higher priorities have (some) influence on how early jobs are started. "
+                "The default is no priority, which is equivalent to 0.",
+                choices=range(-1024, 1023)
+        )
         argparse.add_argument("--queue",metavar="queue[@host]", default=None,type=str,help="Select queue to use to run the job")
-        argparse.add_argument("--merge_stdout_stderr", metavar="true|false", default=None,type=utils.interpret_string_as_bool,help="Merge stdout and stderr streams")
-        argparse.add_argument("--send_email_end", metavar="true|false", default=None,type=utils.interpret_string_as_bool,help="Send an email if the job ends")
-        argparse.add_argument("--send_email_begin", metavar="true|false", default=None,type=utils.interpret_string_as_bool,help="Send an email if the job begins")
-        argparse.add_argument("--send_email_error", metavar="true|false", default=None,type=utils.interpret_string_as_bool,help="Send an email if the job has an error")
+        argparse.add_argument("--merge-error", action='store_const', default=None,
+            const=True, help="Merge stdout and stderr streams", dest="merge_error")
+        argparse.add_argument("--no-merge-error", action='store_const', default=None,
+            const=False, help="Do not merge stdout and stderr streams",
+            dest="merge_error")
+        argparse.add_argument("--email", default=None,
+                type=str, nargs='+', help="When to send an email about the job",
+                choices=["begin", "end", "error"]
+        )
 
     def examine_args(self,args):
         """
@@ -534,17 +548,13 @@ class jobscript_builder:
         if args.queue is not None:
             data.queue_name = args.queue
 
-        if args.merge_stdout_stderr is not None:
-            data.merge_stdout_stderr = args.merge_stdout_stderr
+        if args.merge_error is not None:
+            data.merge_stdout_stderr = args.merge_error
 
-        if args.send_email_end is not None:
-            data.send_email_on.end = args.send_email_end
-
-        if args.send_email_begin is not None:
-            data.send_email_on.begin = args.send_email_begin
-
-        if args.send_email_error is not None:
-            data.send_email_on.error = args.send_email_error
+        if args.email is not None:
+            data.send_email_on.end = "end" in args.email
+            data.send_email_on.begin = "begin" in args.email
+            data.send_email_on.error = "error" in args.email
 
         if args.qsys_args is not None:
             qsys = self.__qsys
