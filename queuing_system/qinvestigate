@@ -71,8 +71,10 @@ setup_ssh_keys() {
 		Currently there is no ssh-agent running for your user on this host.
 		This implies that you will have to type your password each time this
 		script needs to login to one of the nodes.
-		For some commands this can be quite tedious, so the use of an 
+		For some commands this can be quite tedious, so the use of an
 		ssh-agent is highly recommended.
+		You can disable this message by setting ADDSSHKEY=n in the
+		configuration file.
 
 		EOF
 		sleep $WARNINGWAIT
@@ -87,8 +89,10 @@ setup_ssh_keys() {
 		cat <<- EOF
 		WARNING: No ssh public key found
 		Currently there is no ssh public key found in your HOME/.ssh folder
-		Please generate a key using "ssh-keygen" or (if your key is not 
+		Please generate a key using "ssh-keygen" or (if your key is not
 		at the default location) add it manually to the agent.
+		You can disable this message by setting ADDSSHKEY=n in the
+		configuration file.
 
 		If you have no clue what this means, most probably the first thing
 		is the case and I suggest you read the manpage of ssh-keygen ;)
@@ -128,10 +132,10 @@ script_usage() {
 	   --add-sshkey        enable or disable the check for a running ssh-agent
 	   --no-add-sshkey     available keys and the automatic querying for a
 	                       password to add the key to your agent.
-	
+
 	Features of the shell:
 	The shell has basic tab completion and tries to match jobs according
-	to both JOB ID and JOB name whereever a command requires an <ID> or 
+	to both JOB ID and JOB name whereever a command requires an <ID> or
 	a <list>.
 
 	The script makes use of the environment variable \$USER to filter out
@@ -152,11 +156,11 @@ default_config() {
 	# spits out the default configuration
 
 	cat <<- EOF
-	# The systax of all options is 
+	# The syntax of all options is
 	# <OPTIONNAME> = "<OPTIONVALUE>"
 	# Both spaces around the = as well as the " around the
-	# <OPTIONVALUE> are optional. 
-	# 
+	# <OPTIONVALUE> are optional.
+	#
 	# <OPTIONVALUE> may not continue any of the three characters
 	#  " = '
 
@@ -170,14 +174,14 @@ default_config() {
 		ADDSSHKEY="$ADDSSHKEY"
 
 		# Absolute number of hours of remaining walltime below which
-	       	# job is considered to be running out of walltime very soon.
+		# job is considered to be running out of walltime very soon.
 		WALLTIME_WARNING_ABS=$WALLTIME_WARNING_ABS
 
 		# Relative percentage of remaining walltime below which
 		# job is considered to be running out of walltime very soon.
 		WALLTIME_WARNING_REL=$WALLTIME_WARNING_REL
 
-		# Should the delete command confirm its action 
+		# Should the delete command confirm its action
 		# before sending the qdel to the master
 		# valid values: "y" or "n"
 		DELETE_CONFIRMATION=$DELETE_CONFIRMATION
@@ -185,7 +189,7 @@ default_config() {
 
 	aliases {
 		# Type in this block the aliases for the qinvestigate shell
-		# The syntax is (similar to bash): 
+		# The syntax is (similar to bash):
 		#   alias <SHORT FORM>="<LONG FORM>"
 		# for example consider
 		#   alias l="login"
@@ -201,7 +205,7 @@ default_config() {
 }
 
 parse_config() {
-	#Parse mainblock	
+	#Parse mainblock
 	ConfigParseBlock "main" $ALLGLOBALSETTINGS
 	case "$?" in
 		2)
@@ -223,7 +227,7 @@ parse_config() {
 			echo "NOTICE: Default config dumped in file `ConfigPath`"
 			sleep $WARNINGWAIT
 			parse_config
-		       	return $?
+			return $?
 			;;
 	esac
 
@@ -357,7 +361,7 @@ empty_list_commands_cache() {
 #####################
 
 print_help_for_category() {
-	case "$1" in 
+	case "$1" in
 		list)
 			EXTRA="<list>"
 			;;
@@ -425,11 +429,11 @@ node_for_jobid() {
 			}
 
 			#get rid of /procnumber:
-	       		gsub(/\/[0-9]+/,"",$12);
+			gsub(/\/[0-9]+/,"",$12);
 
-			#split at the +	
+			#split at the +
 			split($12,a,"+")
-			
+
 			#check if all the same node
 			node=a[1];
 			for (ind in a) {
@@ -471,9 +475,9 @@ amend_qstat() {
 	awk '
 		function getstart(job) {
 			#note this function implicitly sets $0, $1, $2 to ""
-	       		cmd="showstart " job
+			cmd="showstart " job
 			while ( (cmd | getline) ) {
-			       	if (match($0,"start")) {
+				if (match($0,"start")) {
 					sub("^.* on ","")
 					close(cmd)
 					return $0
@@ -485,9 +489,9 @@ amend_qstat() {
 
 		function getend(job) {
 			#note this function implicitly sets $0, $1, $2 to ""
-	       		cmd="showstart " job
+			cmd="showstart " job
 			while ( (cmd | getline) ) {
-			       	if (match($0,"completion")) {
+				if (match($0,"completion")) {
 					sub("^.* on ","")
 					close(cmd)
 					return $0
@@ -711,12 +715,12 @@ AWK_TOSEC='
 #-- commands --#
 ################
 #Note: - functions for commands start with a "c_", followed by the
-#        commands name and a suffix for the kind of arguments the 
+#        commands name and a suffix for the kind of arguments the
 #        command requires:
-#            - "_none" for no argument 
+#            - "_none" for no argument
 #            - "_id"   for a single job id
 #            - "_list" for a list of job ids.
-#            - "_node" for the node as the first arg 
+#            - "_node" for the node as the first arg
 #                      and the job id as the second argument
 #            - "_nodelist" A list of all active and available nodes
 #                      as the passed arguments
@@ -743,7 +747,7 @@ c_help_none() {
 	   <list> is a list of job ids or a list of jobnames or a pattern
 	If a pattern gives rise to more than one matching entry, than
 	it is only valid for a command expecting a <list>
-	
+
 	Bugs / Suggestions / Feature Requests:
 	      $DEVELOPER
 	EOF
@@ -752,9 +756,9 @@ c_help_none() {
 c_alias_none() {
 	help_string "List defined aliases"
 	local ALIASES_INDICES=${!ALIASES[@]}
-	for ind in $ALIASES_INDICES; do 
+	for ind in $ALIASES_INDICES; do
 		echo "alias $ind=\"${ALIASES[$ind]}\""
-	done	
+	done
 }
 
 c_joblist_none() {
@@ -763,10 +767,10 @@ c_joblist_none() {
 }
 
 c_summary_none() {
-	help_string "print a short summary including 
-	- jobs running out of walltime 
-	- recently submitted jobs 
-	- summary of load on the cluster 
+	help_string "print a short summary including
+	- jobs running out of walltime
+	- recently submitted jobs
+	- summary of load on the cluster
 	- your fairshare stats"
 
 	# cache:
@@ -802,11 +806,11 @@ c_summary_none() {
 
 	echo
 	qnodes | awk '
-       		BEGIN {curnode="";}
-	       	
+		BEGIN {curnode="";}
+
 		curnode != "" && /^[[:space:]]*$/ {curnode="";next}
 		/^[[:graph:]]+$/ { curnode=$0; next }
-		
+
 		curnode != "" && $1 == "state" && ( $3 == "offline" || $3 == "down" ) { curnode=""; next }
 	       	curnode != "" && $1 == "np" { nodetotcpus[curnode]=$3; nodes[++nodecount]=curnode }
 		curnode != "" && $1 == "properties" { nodeprops[curnode]= $3}
@@ -814,14 +818,14 @@ c_summary_none() {
 		curnode != "" && $1 == "status" {
 			avail=0  #available memory in kb
 			tot=0	#total memory in kb
-			
+
 			#shift first two fields away:
 			for (i=1; i <= NF; ++i) {
 				$i=$(i+2)
 			}
-			
+
 			split($0,a,",")
-			for (ind in a) { 
+			for (ind in a) {
 				if (pos=match(a[ind],/^availmem=/)) {
 					avail=substr(a[ind],pos+9)
 					sub(/kb$/,"",avail)
@@ -834,13 +838,13 @@ c_summary_none() {
 			nodeavailmem[curnode]=avail
 			nodetotmem[curnode]=tot
 		}
-		
+
 		END {
 			maxlen=0 #max number of chars for the hostname
 			for (i=1; i<=nodecount; ++i) {
 				if (length(nodes[i]) > maxlen) {
 					maxlen=length(nodes[i])
-				}	
+				}
 			}
 
 			printf "%-" maxlen "s  %8s   %19s   %s\n", "Node", "availCPU", "%TOT (avail mem) MiB", "properties"
@@ -855,9 +859,9 @@ c_summary_none() {
 				colaft=""
 				if (nodeavailcpus[nodes[i]] > 0) {
 					colbef="\033[0;32m"
-					colaft="\033[0;00m"	
+					colaft="\033[0;00m"
 				}
-				
+
 				percentmemory="00"
 				if (nodetotmem[nodes[i]] > 0) {
 					percentmemory = nodeavailmem[nodes[i]]/nodetotmem[nodes[i]]*100
@@ -874,11 +878,11 @@ c_summary_none() {
 	diagnose -f | awk -v "user=$USER" '
 		BEGIN { pr=0 }
 		pr > 0 && /^$/ { exit }
-	       	pr==1 && /^-------------$/ { pr=2; next };
-	       	pr == 0 && /^USER$/ { pr=1; next }
+		pr==1 && /^-------------$/ { pr=2; next };
+		pr == 0 && /^USER$/ { pr=1; next }
 		pr == 2 { arr[$1]=$2; }
 		pr == 2 && $0 ~ "^" user "\\*? " { userline=$0 ; user=$1; next }
-		END { 
+		END {
 			n = asort(arr,sorted)
 			i=1
 			for(;i <=n;++i) { if(sorted[i] == arr[user]) break; }
@@ -894,11 +898,11 @@ c_summary_none() {
 			#print heading:
 			printf "%-26s%8s%8s","FSInterval","%","Target"
 			for (i=4;i<=n; ++i) {
-				printf "%8s", (i-4)	
-			}	
+				printf "%8s", (i-4)
+			}
 			printf "\n"
-		
-			#print content:	
+
+			#print content:
 			printf "%-20s%-6s", ulfields[1], "(" place string	")"
 			for (i=2; i<=n; ++i) {
 				printf "%8s", ulfields[i]
@@ -912,12 +916,6 @@ c_summary_none() {
 #	help_string "display some job statistics"
 #       ???
 #
-#	echo $FUNCNAME called with args $@
-#	#TODO
-#}
-
-#c_wtincrease_id() {
-#	help_string "increase walltime by sending sysadmin an email"
 #	echo $FUNCNAME called with args $@
 #	#TODO
 #}
@@ -947,7 +945,7 @@ c_top_node() {
 
 c_delete_list() {
 	help_string "Delete one or more jobs"
-	
+
 	local LIST="$1"
 	local RES
 	for ID in $LIST; do
@@ -958,7 +956,7 @@ c_delete_list() {
 		fi
 		if [ "$RES" == "y" ]; then
 			qdel $ID
-		fi	
+		fi
 	done
 }
 
@@ -1031,7 +1029,7 @@ preliminary_checks
 while [ "$1" ]; do
 	case "$1" in
 		-h|--help)
-			script_usage 
+			script_usage
 			exit 0
 			;;
 		--add-sshkey)
