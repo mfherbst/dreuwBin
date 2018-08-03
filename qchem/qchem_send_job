@@ -221,6 +221,7 @@ class qchem_script_builder(jsb.jobscript_builder):
 
         # Copy plots (newer qchem versions)
         ret.append("plots")
+        ret.append(self.__qchem_args.outfile + ".plots")
 
         # TODO possible other ideas:
         # plot.attach.alpha
