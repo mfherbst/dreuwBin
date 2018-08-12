@@ -40,5 +40,5 @@ else
 fi
 
 $QUOTA | awk 'NR == 3 {
-	printf("quota usage:  %6.2f%%    (%2iG of %2iG used)\n", $2/$3*100,$2/1000/1000,$3/1000/1000)
+	printf("quota usage:  %6.2f%%    (%4.1fG of %4.1fG used)\n", $2/$3*100,$2/1000/1000,$3/1000/1000)
 	}'
