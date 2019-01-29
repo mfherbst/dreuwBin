@@ -6,7 +6,7 @@ import os
 import sys
 
 
-allowedHosts = range(1, 16)
+allowedHosts = range(1, 20)
 
 
 class Error(Exception):
@@ -82,7 +82,7 @@ def parseCommandline():
 		"\nallowed.  Example:  KNECHT_LIST=1,3-5,7,9 will cause this script to delete"
 		"\nscratch files on knecht01, knecht03, knecht04, knecht05, knecht07 and"
 		"\nknecht09.  The default is to delete files on all nodes, i. e. knecht01"
-		"\nthrough knecht15.", action="store", default="1-15", type="str",
+		"\nthrough knecht19.", action="store", default="1-19", type="str",
 		dest="hostsString", metavar="KNECHT_LIST")
 	# hidden option for execution on nodes
 	parser.add_option("--delete-scratch-files-here", help=SUPPRESS_HELP,
