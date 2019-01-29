@@ -7,9 +7,7 @@ import sys
 
 
 brokenHosts = [6, ]
-allowedHosts = range(1, 20)
-for b in brokenHosts:
-	allowedHosts.pop(allowedHosts.index(b))
+allowedHosts = [h for h in range(1, 20) if not h in brokenHosts]
 
 
 class Error(Exception):
