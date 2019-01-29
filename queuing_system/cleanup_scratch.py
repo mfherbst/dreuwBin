@@ -6,7 +6,10 @@ import os
 import sys
 
 
+brokenHosts = [6, ]
 allowedHosts = range(1, 20)
+for b in brokenHosts:
+	allowedHosts.pop(allowedHosts.index(b))
 
 
 class Error(Exception):
@@ -34,6 +37,26 @@ def getUserScratchDirs():
 
 def absPathOfThisScript():
 	return os.path.abspath(sys.argv[0])
+
+
+def makeStringFromHostList(hostList):
+	entities = []
+	startHost = hostList[0]
+	for ind, h in enumerate(hostList):
+		if ind == 0:
+			continue
+		if not h == hostList[ind-1]+1:
+			entities.append((startHost, hostList[ind-1]))
+			startHost = h
+	else:
+		entities.append((startHost, hostList[-1]))
+	hostStrings = []
+	for entity in entities:
+		if entity[0] == entity[1]:
+			hostStrings.append("{:d}".format(entity[0]))
+		else:
+			hostStrings.append("{:d}-{:d}".format(*entity))
+	return ",".join(sorted(list(set(hostStrings))))
 
 
 def parseHostsString(string):
@@ -81,8 +104,8 @@ def parseCommandline():
 		"\nnodes.  Pass a comma-separated list of numbers.  Ranges using '-' are also"
 		"\nallowed.  Example:  KNECHT_LIST=1,3-5,7,9 will cause this script to delete"
 		"\nscratch files on knecht01, knecht03, knecht04, knecht05, knecht07 and"
-		"\nknecht09.  The default is to delete files on all nodes, i. e. knecht01"
-		"\nthrough knecht19.", action="store", default="1-19", type="str",
+		"\nknecht09.  The default is '{:s}'.".format(makeStringFromHostList(allowedHosts)),
+		action="store", default=makeStringFromHostList(allowedHosts), type="str",
 		dest="hostsString", metavar="KNECHT_LIST")
 	# hidden option for execution on nodes
 	parser.add_option("--delete-scratch-files-here", help=SUPPRESS_HELP,
