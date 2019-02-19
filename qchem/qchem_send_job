@@ -235,7 +235,6 @@ class qchem_script_builder(jsb.jobscript_builder):
         # plot.trans
         # plot.hf
         # plot.mo
-        # AIMD (directory)
 
         return ret
 
@@ -249,6 +248,7 @@ class qchem_script_builder(jsb.jobscript_builder):
         # Copy plots (older qchem versions)
         if self.__qchem_args.savedir:
             ret.append(self.__qchem_args.savedir + "/plots")
+            ret.append(self.__qchem_args.savedir + "/AIMD")
 
         return ret
 
