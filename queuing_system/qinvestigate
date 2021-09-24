@@ -558,7 +558,7 @@ shell_loop() {
 	echo
 	echo "Enter 'help' for a list of implemented commands or 'quit' to quit the shell"
 
-	while true; do
+	while read -e -p "($(printf "%6s" "$LASTJOBID")) >" LINE; do
 		if [ $RET != 0 ]; then
 			echo -e "rc: \033[0;32m$RET\033[0;00m"
 		fi
@@ -567,8 +567,6 @@ shell_loop() {
 		TAB_FIRST_WORDS=( $(list_commands_aliases) )
 		bind -x '"\t":"tabcomplete_first_word"';
 		#TODO implement completion for arguments
-
-		read -e -p "($(printf "%6s" "$LASTJOBID")) >" LINE
 		
 		if [ "$LINE" ]; then
 			history -s "$LINE"
